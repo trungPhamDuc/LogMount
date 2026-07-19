@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LogMount")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+876b758748e5adca34cdc47eca370899fed457f6")]
 [assembly: System.Reflection.AssemblyProductAttribute("LogMount")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LogMount")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

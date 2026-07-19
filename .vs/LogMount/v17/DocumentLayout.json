@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "D:\\C# 3\\LogMount\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|d:\\c# 3\\logmount\\logmount\\services\\logdatastore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|solutionrelative:logmount\\services\\logdatastore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|d:\\c# 3\\logmount\\logmount\\pages\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|solutionrelative:logmount\\pages\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|d:\\c# 3\\logmount\\logmount\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
       "RelativeMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|solutionrelative:logmount\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     }
@@ -14,7 +22,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 613,
-          "SelectedChildIndex": 198,
+          "SelectedChildIndex": 197,
           "Children": [
             {
               "$type": "Bookmark",
@@ -805,12 +813,38 @@
               "Name": "ST:0:0:{004be353-6879-467c-9d1e-9ac23cdf6d49}"
             },
             {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "LogDataStore.cs",
+              "DocumentMoniker": "D:\\C# 3\\LogMount\\LogMount\\Services\\LogDataStore.cs",
+              "RelativeDocumentMoniker": "LogMount\\Services\\LogDataStore.cs",
+              "ToolTip": "D:\\C# 3\\LogMount\\LogMount\\Services\\LogDataStore.cs",
+              "RelativeToolTip": "LogMount\\Services\\LogDataStore.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-19T04:05:46.151Z",
+              "EditorCaption": ""
+            },
+            {
               "$type": "Bookmark",
               "Name": "ST:26:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
+              "Title": "Index.cshtml.cs",
+              "DocumentMoniker": "D:\\C# 3\\LogMount\\LogMount\\Pages\\Index.cshtml.cs",
+              "RelativeDocumentMoniker": "LogMount\\Pages\\Index.cshtml.cs",
+              "ToolTip": "D:\\C# 3\\LogMount\\LogMount\\Pages\\Index.cshtml.cs",
+              "RelativeToolTip": "LogMount\\Pages\\Index.cshtml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-19T04:02:37.041Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "appsettings.json",
               "DocumentMoniker": "D:\\C# 3\\LogMount\\LogMount\\appsettings.json",
               "RelativeDocumentMoniker": "LogMount\\appsettings.json",

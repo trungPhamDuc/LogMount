@@ -1,0 +1,17 @@
+@model (string Section, LogMount.Pages.IndexModel PageModel)
+
+<div class="export-actions d-flex flex-wrap align-items-center gap-2">
+    <span class="text-muted small">Tải xuống:</span>
+    <a asp-page="./Index"
+       asp-page-handler="Export"
+       asp-all-route-data="@Model.PageModel.GetExportRouteValues(Model.Section, "csv")"
+       class="btn btn-sm btn-outline-success">
+        CSV
+    </a>
+    <a asp-page="./Index"
+       asp-page-handler="Export"
+       asp-all-route-data="@Model.PageModel.GetExportRouteValues(Model.Section, "xlsx")"
+       class="btn btn-sm btn-outline-primary">
+        XLSX
+    </a>
+</div>

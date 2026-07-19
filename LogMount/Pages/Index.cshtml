@@ -1,10 +1,357 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Phân tích Retry Log";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <h1 class="h2 mb-1">Phân tích Retry Log</h1>
+        <p class="text-muted mb-0">Upload file log (.csv, .xlsx, .xls) để xem dữ liệu và tổng hợp lỗi theo tất cả các cột.</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Upload file log</h2>
+            <form method="post" asp-page-handler="Upload" enctype="multipart/form-data" class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label asp-for="UploadFile" class="form-label">Chọn file (.csv, .xlsx, .xls)</label>
+                    <input asp-for="UploadFile" type="file" class="form-control" accept=".csv,.xlsx,.xls" required />
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Upload &amp; đọc dữ liệu</button>
+                    @if (Model.HasData)
+                    {
+                        <button type="submit" formaction="?handler=Clear" formmethod="post" class="btn btn-outline-danger"
+                                onclick="return confirm('Xóa dữ liệu đã tải lên?');">
+                            Xóa dữ liệu
+                        </button>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.HasData)
+    {
+        <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+            <div>
+                <strong>Đã load dữ liệu:</strong> @Model.UploadedFileName —
+                <strong>@Model.TotalRecords.ToString("N0")</strong> dòng.
+                Cuộn xuống bên dưới để xem bảng dữ liệu và tìm kiếm.
+            </div>
+            <a href="#log-data-section" class="btn btn-sm btn-outline-primary">Xem dữ liệu ↓</a>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                        <h2 class="h5 mb-1">Tìm kiếm &amp; tổng hợp lỗi</h2>
+                        <p class="text-muted small mb-0">
+                            File: <strong>@Model.UploadedFileName</strong> —
+                            Tổng: <strong>@Model.TotalRecords.ToString("N0")</strong> dòng
+                            @if (Model.IsFiltered)
+                            {
+                                <span>— Kết quả lọc: <strong>@Model.FilteredRecords.ToString("N0")</strong> dòng</span>
+                            }
+                        </p>
+                    </div>
+                </div>
+
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label asp-for="Filter.Language" class="form-label">Language</label>
+                        <input asp-for="Filter.Language" class="form-control" placeholder="VD: EN" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.OccurrenceTime" class="form-label">Occurrence Time</label>
+                        <input asp-for="Filter.OccurrenceTime" class="form-control" placeholder="VD: 2026/07/18" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.LotName" class="form-label">Lot Name</label>
+                        <input asp-for="Filter.LotName" class="form-control" placeholder="VD: EBR25938" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.ErrorNo" class="form-label">Error No.</label>
+                        <input asp-for="Filter.ErrorNo" class="form-control" placeholder="VD: 31" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.ErrorName" class="form-label">Error Name</label>
+                        <input asp-for="Filter.ErrorName" class="form-control" placeholder="VD: PICK UP ERROR" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.Lane" class="form-label">Lane</label>
+                        <input asp-for="Filter.Lane" class="form-control" placeholder="VD: 1" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.Table" class="form-label">Table</label>
+                        <input asp-for="Filter.Table" class="form-control" placeholder="VD: A" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.PartsNo" class="form-label">Parts No.</label>
+                        <input asp-for="Filter.PartsNo" class="form-control" placeholder="VD: 50" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.PartsName" class="form-label">Parts Name</label>
+                        <input asp-for="Filter.PartsName" class="form-control" placeholder="VD: EBC64038607" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.HeadNo" class="form-label">Head No.</label>
+                        <input asp-for="Filter.HeadNo" class="form-control" placeholder="VD: 11" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.NozzleType" class="form-label">Nozzle Type</label>
+                        <input asp-for="Filter.NozzleType" class="form-control" placeholder="VD: TYPE-512" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.FeederNo" class="form-label">Feeder No.</label>
+                        <input asp-for="Filter.FeederNo" class="form-control" placeholder="VD: 112" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.FeederId" class="form-label">Feeder ID</label>
+                        <input asp-for="Filter.FeederId" class="form-control" placeholder="VD: ZSY-008-0044951A" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.CartId" class="form-label">Cart ID</label>
+                        <input asp-for="Filter.CartId" class="form-control" placeholder="VD: CTS$46$" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.VisErrorNo" class="form-label">Vis Error No.</label>
+                        <input asp-for="Filter.VisErrorNo" class="form-control" placeholder="VD: VE150" />
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.ErrorVacuum" class="form-label">Error Vacuum</label>
+                        <input asp-for="Filter.ErrorVacuum" class="form-control" placeholder="VD: 165" />
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Tìm kiếm</button>
+                        <a asp-page="./Index" class="btn btn-outline-secondary">Xóa bộ lọc</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        @if (Model.FilteredRecords > 0 && Model.ErrorSummary.Count > 0)
+        {
+            @if (Model.IsFiltered)
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                            <div>
+                                <h2 class="h5 card-title mb-1">Thông tin tổng quan (kết quả lọc)</h2>
+                                <p class="text-muted small mb-0">Giá trị khác nhau trong từng cột của dữ liệu đã lọc.</p>
+                            </div>
+                            <partial name="_ExportButtons" model='("Overview", Model)' />
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th style="width: 160px;">Cột</th>
+                                        <th>Giá trị</th>
+                                        <th style="width: 100px;" class="text-end">Số giá trị</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var col in Model.ColumnSummary)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@col.ColumnName</td>
+                                            <td>@col.Values</td>
+                                            <td class="text-end">@col.DistinctCount.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h2 class="h5 card-title mb-1">@(Model.IsFiltered ? "Tổng hợp lỗi (kết quả lọc)" : "Tổng hợp lỗi (toàn bộ file)")</h2>
+                            <p class="text-muted small mb-0">
+                                @(Model.IsFiltered
+                                    ? "Số lần xuất hiện của từng loại lỗi theo điều kiện tìm kiếm."
+                                    : "Số lần xuất hiện của từng loại lỗi trong toàn bộ file. Nhập Parts Name / Feeder No. ở trên để lọc chi tiết hơn.")
+                            </p>
+                        </div>
+                        <partial name="_ExportButtons" model='("Errors", Model)' />
+                    </div>
+                    <div class="table-responsive summary-table-wrapper">
+                        <table class="table table-sm table-striped table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Error No.</th>
+                                    <th>Error Name</th>
+                                    <th class="text-end">Số lần</th>
+                                    <th>Occurrence Time</th>
+                                    <th>Lot Name</th>
+                                    <th>Lane</th>
+                                    <th>Table</th>
+                                    <th>Parts No.</th>
+                                    <th>Parts Name</th>
+                                    <th>Head No.</th>
+                                    <th>Nozzle Type</th>
+                                    <th>Feeder No.</th>
+                                    <th>Feeder ID</th>
+                                    <th>Cart ID</th>
+                                    <th>Vis Error No.</th>
+                                    <th>Error Vacuum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.ErrorSummary)
+                                {
+                                    <tr>
+                                        <td>@item.ErrorNo</td>
+                                        <td class="error-name-cell">
+                                            <span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span>
+                                        </td>
+                                        <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        <td>@item.OccurrenceTimes</td>
+                                        <td>@item.LotNames</td>
+                                        <td>@item.Lanes</td>
+                                        <td>@item.Tables</td>
+                                        <td>@item.PartsNumbers</td>
+                                        <td>@item.PartsNames</td>
+                                        <td>@item.HeadNumbers</td>
+                                        <td>@item.NozzleTypes</td>
+                                        <td>@item.FeederNumbers</td>
+                                        <td>@item.FeederIds</td>
+                                        <td>@item.CartIds</td>
+                                        <td>@item.VisErrorNumbers</td>
+                                        <td>@item.ErrorVacuums</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary fw-semibold">
+                                    <td colspan="2">Tổng cộng</td>
+                                    <td class="text-end">@Model.ErrorSummary.Sum(x => x.Count).ToString("N0")</td>
+                                    <td colspan="13"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (Model.IsFiltered)
+        {
+            <div class="alert alert-warning">Không tìm thấy dữ liệu phù hợp với điều kiện tìm kiếm.</div>
+        }
+
+        <div class="card shadow-sm" id="log-data-section">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                    <div>
+                        <h2 class="h5 card-title mb-1">Dữ liệu log (@Model.FilteredRecords.ToString("N0") dòng)</h2>
+                        <p class="text-muted small mb-0">Tải xuống sẽ bao gồm toàn bộ dòng đang được lọc, không chỉ trang hiện tại.</p>
+                    </div>
+                    <partial name="_ExportButtons" model='("Logs", Model)' />
+                </div>
+                <div class="table-responsive log-table-wrapper">
+                    <table class="table table-sm table-bordered table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Language</th>
+                                <th>Occurrence Time</th>
+                                <th>Lot Name</th>
+                                <th>Error No.</th>
+                                <th>Error Name</th>
+                                <th>Lane</th>
+                                <th>Table</th>
+                                <th>Parts No.</th>
+                                <th>Parts Name</th>
+                                <th>Head No.</th>
+                                <th>Nozzle Type</th>
+                                <th>Feeder No.</th>
+                                <th>Feeder ID</th>
+                                <th>Cart ID</th>
+                                <th>Vis Error No.</th>
+                                <th>Error Vacuum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.DisplayEntries)
+                            {
+                                <tr>
+                                    <td>@row.Language</td>
+                                    <td>@row.OccurrenceTime</td>
+                                    <td>@row.LotName</td>
+                                    <td>@row.ErrorNo</td>
+                                    <td class="error-name-cell">
+                                        @if (string.IsNullOrWhiteSpace(row.ErrorName))
+                                        {
+                                            <span class="error-name-tag error-name-empty">—</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="@IndexModel.GetErrorNameCssClass(row.ErrorName)">@row.ErrorName</span>
+                                        }
+                                    </td>
+                                    <td>@row.Lane</td>
+                                    <td>@row.Table</td>
+                                    <td>@row.PartsNo</td>
+                                    <td>@row.PartsName</td>
+                                    <td>@row.HeadNo</td>
+                                    <td>@row.NozzleType</td>
+                                    <td>@row.FeederNo</td>
+                                    <td>@row.FeederId</td>
+                                    <td>@row.CartId</td>
+                                    <td>@row.VisErrorNo</td>
+                                    <td>@row.ErrorVacuum</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav class="mt-3" aria-label="Phân trang">
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : "")">
+                                <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(Model.PageNumber - 1)">Trước</a>
+                            </li>
+                            @for (var i = 1; i <= Model.TotalPages; i++)
+                            {
+                                <li class="page-item @(i == Model.PageNumber ? "active" : "")">
+                                    <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(i)">@i</a>
+                                </li>
+                            }
+                            <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                                <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(Model.PageNumber + 1)">Sau</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    <p class="text-center text-muted small mt-2 mb-0">
+                        Trang @Model.PageNumber / @Model.TotalPages — hiển thị @Model.DisplayEntries.Count dòng
+                    </p>
+                }
+            </div>
+        </div>
+    }
 </div>

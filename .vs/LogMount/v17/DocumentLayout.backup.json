@@ -1,7 +1,12 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "D:\\C# 3\\LogMount\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|d:\\c# 3\\logmount\\logmount\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{3ABB85E7-7C1C-4BEC-91E1-FEFC69AFFC81}|LogMount\\LogMount.csproj|solutionrelative:logmount\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,7 +14,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 613,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 198,
           "Children": [
             {
               "$type": "Bookmark",
@@ -802,6 +807,19 @@
             {
               "$type": "Bookmark",
               "Name": "ST:26:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "D:\\C# 3\\LogMount\\LogMount\\appsettings.json",
+              "RelativeDocumentMoniker": "LogMount\\appsettings.json",
+              "ToolTip": "D:\\C# 3\\LogMount\\LogMount\\appsettings.json",
+              "RelativeToolTip": "LogMount\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-07-18T15:23:48.015Z",
+              "EditorCaption": ""
             }
           ]
         },
