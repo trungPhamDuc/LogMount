@@ -11,24 +11,33 @@ public class IndexModel : PageModel
     private const long MaxFileSize = 50 * 1024 * 1024;
 
     private readonly IRetryLogParserService _parserService;
+    private readonly IPartListParserService _partListParserService;
     private readonly ILogDataStore _logDataStore;
+    private readonly IPartDataStore _partDataStore;
     private readonly ILogExportService _exportService;
     private readonly ILogger<IndexModel> _logger;
 
     public IndexModel(
         IRetryLogParserService parserService,
+        IPartListParserService partListParserService,
         ILogDataStore logDataStore,
+        IPartDataStore partDataStore,
         ILogExportService exportService,
         ILogger<IndexModel> logger)
     {
         _parserService = parserService;
+        _partListParserService = partListParserService;
         _logDataStore = logDataStore;
+        _partDataStore = partDataStore;
         _exportService = exportService;
         _logger = logger;
     }
 
     [BindProperty]
-    public IFormFile? UploadFile { get; set; }
+    public List<IFormFile> UploadFiles { get; set; } = [];
+
+    [BindProperty]
+    public IFormFile? PartListFile { get; set; }
 
     [BindProperty(SupportsGet = true)]
     public LogFilterCriteria Filter { get; set; } = new();
@@ -37,6 +46,9 @@ public class IndexModel : PageModel
     public int PageNumber { get; set; } = 1;
 
     public string? UploadedFileName { get; set; }
+    public int UploadedFileCount { get; set; }
+    public string? UploadedPartFileName { get; set; }
+    public int UploadedPartCount { get; set; }
     public int TotalRecords { get; set; }
     public int FilteredRecords { get; set; }
     public int TotalPages { get; set; }
@@ -46,54 +58,89 @@ public class IndexModel : PageModel
     public string? StatusMessage { get; set; }
     public string? ErrorMessage { get; set; }
     public bool HasData => TotalRecords > 0;
+    public bool HasPartData => UploadedPartCount > 0;
+    public bool CanSummarizeExpensiveParts => HasData && HasPartData;
     public bool IsFiltered => Filter.HasAnyFilter;
 
     public async Task<IActionResult> OnPostUploadAsync(CancellationToken cancellationToken)
     {
-        if (UploadFile is null || UploadFile.Length == 0)
+        var files = UploadFiles.Where(f => f.Length > 0).ToList();
+        if (files.Count == 0)
         {
-            ErrorMessage = "Vui lòng chọn file để upload.";
+            ErrorMessage = "Vui lòng chọn ít nhất một file để upload.";
             return Page();
         }
 
-        if (UploadFile.Length > MaxFileSize)
+        var allEntries = new List<RetryLogEntry>();
+        var fileNames = new List<string>();
+        var parseErrors = new List<string>();
+
+        foreach (var file in files)
         {
-            ErrorMessage = "File quá lớn. Kích thước tối đa là 50 MB.";
-            return Page();
+            if (file.Length > MaxFileSize)
+            {
+                parseErrors.Add($"\"{file.FileName}\": file quá lớn (tối đa 50 MB).");
+                continue;
+            }
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (extension is not (".csv" or ".xlsx" or ".xls"))
+            {
+                parseErrors.Add($"\"{file.FileName}\": chỉ hỗ trợ .csv, .xlsx hoặc .xls.");
+                continue;
+            }
+
+            try
+            {
+                await using var stream = file.OpenReadStream();
+                var entries = await _parserService.ParseAsync(stream, file.FileName, cancellationToken);
+
+                if (entries.Count == 0)
+                {
+                    parseErrors.Add($"\"{file.FileName}\": không có dữ liệu.");
+                    continue;
+                }
+
+                allEntries.AddRange(entries);
+                fileNames.Add(file.FileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse uploaded log file {FileName}.", file.FileName);
+                parseErrors.Add($"\"{file.FileName}\": {ex.Message}");
+            }
         }
 
-        var extension = Path.GetExtension(UploadFile.FileName).ToLowerInvariant();
-        if (extension is not (".csv" or ".xlsx" or ".xls"))
+        if (allEntries.Count == 0)
         {
-            ErrorMessage = "Chỉ hỗ trợ file .csv, .xlsx hoặc .xls.";
+            ErrorMessage = parseErrors.Count > 0
+                ? string.Join(" ", parseErrors)
+                : "Không tìm thấy dữ liệu trong các file.";
             return Page();
         }
 
         try
         {
-            await using var stream = UploadFile.OpenReadStream();
-            var entries = await _parserService.ParseAsync(stream, UploadFile.FileName, cancellationToken);
-
-            if (entries.Count == 0)
-            {
-                ErrorMessage = "Không tìm thấy dữ liệu trong file.";
-                return Page();
-            }
-
             await HttpContext.Session.LoadAsync(cancellationToken);
 
             var dataKey = Guid.NewGuid().ToString("N");
-            _logDataStore.Save(dataKey, entries, UploadFile.FileName);
+            _logDataStore.Save(dataKey, allEntries, fileNames);
             HttpContext.Session.SetString(SessionKeys.LogDataKey, dataKey);
             await HttpContext.Session.CommitAsync(cancellationToken);
 
-            TempData["StatusMessage"] = $"Đã tải lên thành công {entries.Count:N0} dòng từ file \"{UploadFile.FileName}\".";
+            var statusMessage = $"Đã tải lên thành công {allEntries.Count:N0} dòng từ {fileNames.Count} file.";
+            if (parseErrors.Count > 0)
+            {
+                statusMessage += $" ({parseErrors.Count} file lỗi: {string.Join("; ", parseErrors)})";
+            }
+
+            TempData["StatusMessage"] = statusMessage;
             return RedirectToPage(new { PageNumber = 1 });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to parse uploaded log file.");
-            ErrorMessage = $"Không thể đọc file: {ex.Message}";
+            _logger.LogError(ex, "Failed to save uploaded log data.");
+            ErrorMessage = $"Không thể lưu dữ liệu: {ex.Message}";
             return Page();
         }
     }
@@ -115,11 +162,75 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostUploadPartAsync(CancellationToken cancellationToken)
+    {
+        if (PartListFile is null || PartListFile.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Vui lòng chọn file part lkdt để upload.";
+            return RedirectToPage();
+        }
+
+        if (PartListFile.Length > MaxFileSize)
+        {
+            TempData["ErrorMessage"] = "File part lkdt quá lớn. Kích thước tối đa là 50 MB.";
+            return RedirectToPage();
+        }
+
+        var extension = Path.GetExtension(PartListFile.FileName).ToLowerInvariant();
+        if (extension is not (".csv" or ".xlsx" or ".xls"))
+        {
+            TempData["ErrorMessage"] = "File part lkdt chỉ hỗ trợ .csv, .xlsx hoặc .xls.";
+            return RedirectToPage();
+        }
+
+        try
+        {
+            await using var stream = PartListFile.OpenReadStream();
+            var partNames = await _partListParserService.ParseAsync(stream, PartListFile.FileName, cancellationToken);
+
+            await HttpContext.Session.LoadAsync(cancellationToken);
+
+            var partDataKey = Guid.NewGuid().ToString("N");
+            _partDataStore.Save(partDataKey, partNames, PartListFile.FileName);
+            HttpContext.Session.SetString(SessionKeys.PartDataKey, partDataKey);
+            await HttpContext.Session.CommitAsync(cancellationToken);
+
+            TempData["StatusMessage"] = $"Đã tải lên thành công {partNames.Count:N0} linh kiện đắt tiền từ file \"{PartListFile.FileName}\".";
+            return RedirectToPage();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse uploaded part list file.");
+            TempData["ErrorMessage"] = $"Không thể đọc file part lkdt: {ex.Message}";
+            return RedirectToPage();
+        }
+    }
+
+    public async Task<IActionResult> OnPostClearPartAsync(CancellationToken cancellationToken)
+    {
+        await HttpContext.Session.LoadAsync(cancellationToken);
+
+        var partDataKey = HttpContext.Session.GetString(SessionKeys.PartDataKey);
+        if (!string.IsNullOrEmpty(partDataKey))
+        {
+            _partDataStore.Clear(partDataKey);
+        }
+
+        HttpContext.Session.Remove(SessionKeys.PartDataKey);
+        await HttpContext.Session.CommitAsync(cancellationToken);
+
+        TempData["StatusMessage"] = "Đã xóa file part lkdt.";
+        return RedirectToPage();
+    }
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         StatusMessage = TempData["StatusMessage"] as string;
+        ErrorMessage = TempData["ErrorMessage"] as string;
 
         await HttpContext.Session.LoadAsync(cancellationToken);
+
+        await LoadPartSessionAsync(cancellationToken);
 
         var dataKey = HttpContext.Session.GetString(SessionKeys.LogDataKey);
         if (string.IsNullOrEmpty(dataKey))
@@ -137,6 +248,7 @@ public class IndexModel : PageModel
         }
 
         UploadedFileName = session.FileName;
+        UploadedFileCount = session.FileNames.Count > 0 ? session.FileNames.Count : 1;
         TotalRecords = session.Entries.Count;
 
         var filtered = RetryLogAnalysisService.Filter(session.Entries, Filter);
@@ -152,6 +264,26 @@ public class IndexModel : PageModel
             .Skip((PageNumber - 1) * PageSize)
             .Take(PageSize)
             .ToList();
+    }
+
+    private async Task LoadPartSessionAsync(CancellationToken cancellationToken)
+    {
+        var partDataKey = HttpContext.Session.GetString(SessionKeys.PartDataKey);
+        if (string.IsNullOrEmpty(partDataKey))
+        {
+            return;
+        }
+
+        var partSession = _partDataStore.Get(partDataKey);
+        if (partSession is null)
+        {
+            HttpContext.Session.Remove(SessionKeys.PartDataKey);
+            await HttpContext.Session.CommitAsync(cancellationToken);
+            return;
+        }
+
+        UploadedPartFileName = partSession.FileName;
+        UploadedPartCount = partSession.PartNames.Count;
     }
 
     public async Task<IActionResult> OnGetExportAsync(string section, string format, CancellationToken cancellationToken)
@@ -227,6 +359,8 @@ public class IndexModel : PageModel
         {
             ["section"] = section,
             ["format"] = format,
+            ["Filter.Date"] = Filter.Date,
+            ["Filter.Line"] = Filter.Line,
             ["Filter.Language"] = Filter.Language,
             ["Filter.OccurrenceTime"] = Filter.OccurrenceTime,
             ["Filter.LotName"] = Filter.LotName,
@@ -251,6 +385,8 @@ public class IndexModel : PageModel
         return new Dictionary<string, string?>
         {
             ["PageNumber"] = pageNumber.ToString(),
+            ["Filter.Date"] = Filter.Date,
+            ["Filter.Line"] = Filter.Line,
             ["Filter.Language"] = Filter.Language,
             ["Filter.OccurrenceTime"] = Filter.OccurrenceTime,
             ["Filter.LotName"] = Filter.LotName,

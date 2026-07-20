@@ -5,6 +5,8 @@ public class ErrorSummaryItem
     public string ErrorNo { get; set; } = string.Empty;
     public string ErrorName { get; set; } = string.Empty;
     public int Count { get; set; }
+    public string Dates { get; set; } = string.Empty;
+    public string Lines { get; set; } = string.Empty;
     public string OccurrenceTimes { get; set; } = string.Empty;
     public string LotNames { get; set; } = string.Empty;
     public string Lanes { get; set; } = string.Empty;

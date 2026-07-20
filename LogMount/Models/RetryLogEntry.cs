@@ -2,6 +2,8 @@ namespace LogMount.Models;
 
 public class RetryLogEntry
 {
+    public string Date { get; set; } = string.Empty;
+    public string Line { get; set; } = string.Empty;
     public string Language { get; set; } = string.Empty;
     public string OccurrenceTime { get; set; } = string.Empty;
     public string LotName { get; set; } = string.Empty;

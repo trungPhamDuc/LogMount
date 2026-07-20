@@ -12,25 +12,31 @@ public interface ILogExportService
     FileExportResult ExportOverview(IReadOnlyList<ColumnSummaryItem> items, ExportFormat format, string baseFileName);
     FileExportResult ExportErrors(IReadOnlyList<ErrorSummaryItem> items, ExportFormat format, string baseFileName);
     FileExportResult ExportLogs(IReadOnlyList<RetryLogEntry> items, ExportFormat format, string baseFileName);
+    FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName);
 }
 
 public class LogExportService : ILogExportService
 {
     private static readonly string[] LogHeaders =
     [
-        "Language", "Occurrence Time", "Lot Name", "Error No.", "Error Name",
+        "Date", "Line", "Occurrence Time", "Error No.", "Error Name",
         "Lane", "Table", "Parts No.", "Parts Name", "Head No.", "Nozzle Type",
         "Feeder No.", "Feeder ID", "Cart ID", "Vis Error No.", "Error Vacuum"
     ];
 
     private static readonly string[] ErrorHeaders =
     [
-        "Error No.", "Error Name", "Số lần", "Occurrence Time", "Lot Name", "Lane", "Table",
+        "Error No.", "Error Name", "Số lần", "Date", "Line", "Occurrence Time", "Lot Name", "Lane", "Table",
         "Parts No.", "Parts Name", "Head No.", "Nozzle Type", "Feeder No.", "Feeder ID",
         "Cart ID", "Vis Error No.", "Error Vacuum"
     ];
 
     private static readonly string[] OverviewHeaders = ["Cột", "Giá trị", "Số giá trị"];
+
+    private static readonly string[] ExpensivePartHeaders =
+    [
+        "Parts Name", "Line", "Mặt", "Máy", "Error No.", "Error Name", "Số lần"
+    ];
 
     public FileExportResult ExportOverview(IReadOnlyList<ColumnSummaryItem> items, ExportFormat format, string baseFileName)
     {
@@ -51,6 +57,8 @@ public class LogExportService : ILogExportService
             item.ErrorNo,
             item.ErrorName,
             item.Count.ToString(CultureInfo.InvariantCulture),
+            item.Dates,
+            item.Lines,
             item.OccurrenceTimes,
             item.LotNames,
             item.Lanes,
@@ -73,9 +81,9 @@ public class LogExportService : ILogExportService
     {
         var rows = items.Select(item => new string[]
         {
-            item.Language,
+            item.Date,
+            item.Line,
             item.OccurrenceTime,
-            item.LotName,
             item.ErrorNo,
             item.ErrorName,
             item.Lane,
@@ -92,6 +100,22 @@ public class LogExportService : ILogExportService
         });
 
         return Export("du-lieu-log", LogHeaders, rows, format, baseFileName);
+    }
+
+    public FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName)
+    {
+        var rows = items.Select(item => new string[]
+        {
+            item.PartsName,
+            item.Line,
+            item.SideLabel,
+            item.Machine,
+            item.ErrorNo,
+            item.ErrorName,
+            item.Count.ToString(CultureInfo.InvariantCulture)
+        });
+
+        return Export("linh-kien-dat-tien", ExpensivePartHeaders, rows, format, baseFileName);
     }
 
     private static FileExportResult Export(

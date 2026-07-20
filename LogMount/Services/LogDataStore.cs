@@ -5,7 +5,7 @@ namespace LogMount.Services;
 
 public interface ILogDataStore
 {
-    void Save(string sessionId, IReadOnlyList<RetryLogEntry> entries, string fileName);
+    void Save(string sessionId, IReadOnlyList<RetryLogEntry> entries, IReadOnlyList<string> fileNames);
     LogDataSession? Get(string sessionId);
     void Clear(string sessionId);
 }
@@ -13,6 +13,7 @@ public interface ILogDataStore
 public class LogDataSession
 {
     public string FileName { get; set; } = string.Empty;
+    public IReadOnlyList<string> FileNames { get; set; } = [];
     public IReadOnlyList<RetryLogEntry> Entries { get; set; } = [];
     public DateTime UploadedAt { get; set; }
 }
@@ -27,11 +28,12 @@ public class MemoryLogDataStore : ILogDataStore
         _cache = cache;
     }
 
-    public void Save(string sessionId, IReadOnlyList<RetryLogEntry> entries, string fileName)
+    public void Save(string sessionId, IReadOnlyList<RetryLogEntry> entries, IReadOnlyList<string> fileNames)
     {
         var session = new LogDataSession
         {
-            FileName = fileName,
+            FileName = string.Join(", ", fileNames),
+            FileNames = fileNames.ToList(),
             Entries = entries.ToList(),
             UploadedAt = DateTime.Now
         };

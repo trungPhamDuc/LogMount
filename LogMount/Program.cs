@@ -12,7 +12,9 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 builder.Services.AddScoped<IRetryLogParserService, RetryLogParserService>();
+builder.Services.AddScoped<IPartListParserService, PartListParserService>();
 builder.Services.AddSingleton<ILogDataStore, MemoryLogDataStore>();
+builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();
 builder.Services.AddSingleton<ILogExportService, LogExportService>();
 
 var app = builder.Build();

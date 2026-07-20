@@ -108,3 +108,11 @@ body {
 .export-actions .btn {
   min-width: 72px;
 }
+
+.upload-file-list .list-group-item {
+  background: transparent;
+}
+
+.upload-file-list .list-group-item + .list-group-item {
+  border-top: 1px dashed #dee2e6;
+}

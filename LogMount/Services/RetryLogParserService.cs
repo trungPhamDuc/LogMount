@@ -127,11 +127,16 @@ public class RetryLogParserService : IRetryLogParserService
             return string.Empty;
         }
 
+        var lotName = GetValue("Lot Name");
+        var occurrenceTime = GetValue("Occurrence Time");
+
         return new RetryLogEntry
         {
             Language = GetValue("Language"),
-            OccurrenceTime = GetValue("Occurrence Time"),
-            LotName = GetValue("Lot Name"),
+            OccurrenceTime = occurrenceTime,
+            LotName = lotName,
+            Date = LotNameParser.ExtractDate(occurrenceTime),
+            Line = LotNameParser.ParseLine(lotName),
             ErrorNo = GetValue("Error No."),
             ErrorName = GetValue("Error Name"),
             Lane = GetValue("Lane"),

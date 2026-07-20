@@ -1,0 +1,91 @@
+@page
+@model ExpensivePartsModel
+@{
+    ViewData["Title"] = "Tổng hợp linh kiện đắt tiền";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h1 class="h2 mb-1">Tổng hợp linh kiện đắt tiền</h1>
+                <p class="text-muted mb-0">
+                    So sánh part name trong file part lkdt với dữ liệu retry log đã upload.
+                </p>
+            </div>
+            <a asp-page="/Index" class="btn btn-outline-secondary">← Quay lại</a>
+        </div>
+    </div>
+
+    <div class="alert alert-info mb-4">
+        <div><strong>File log:</strong> @Model.LogFileName — @Model.LogRecordCount.ToString("N0") dòng</div>
+        <div><strong>File part lkdt:</strong> @Model.PartFileName — @Model.PartCount.ToString("N0") linh kiện</div>
+        <div><strong>Kết quả khớp:</strong> @Model.Summary.Count.ToString("N0") nhóm lỗi — tổng @Model.TotalErrorCount.ToString("N0") lần</div>
+    </div>
+
+    @if (Model.Summary.Count == 0)
+    {
+        <div class="alert alert-warning">
+            Không tìm thấy lỗi nào liên quan đến linh kiện đắt tiền trong dữ liệu retry log.
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                    <div>
+                        <h2 class="h5 card-title mb-1">Chi tiết lỗi theo linh kiện đắt tiền</h2>
+                        <p class="text-muted small mb-0">
+                            Part name, line, mặt, máy, loại lỗi và số lần xuất hiện.
+                        </p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a asp-page="./ExpensiveParts" asp-page-handler="Export" asp-route-format="Csv"
+                           class="btn btn-sm btn-outline-success">Tải CSV</a>
+                        <a asp-page="./ExpensiveParts" asp-page-handler="Export" asp-route-format="Xlsx"
+                           class="btn btn-sm btn-outline-success">Tải Excel</a>
+                    </div>
+                </div>
+
+                <div class="table-responsive summary-table-wrapper">
+                    <table class="table table-sm table-striped table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Parts Name</th>
+                                <th>Line</th>
+                                <th>Mặt</th>
+                                <th>Máy</th>
+                                <th>Error No.</th>
+                                <th>Error Name</th>
+                                <th class="text-end">Số lần</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Summary)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.PartsName</td>
+                                    <td>@item.Line</td>
+                                    <td>@item.SideLabel (@item.Side)</td>
+                                    <td>@item.Machine</td>
+                                    <td>@item.ErrorNo</td>
+                                    <td class="error-name-cell">
+                                        <span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span>
+                                    </td>
+                                    <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-secondary fw-semibold">
+                                <td colspan="6">Tổng cộng</td>
+                                <td class="text-end">@Model.TotalErrorCount.ToString("N0")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>

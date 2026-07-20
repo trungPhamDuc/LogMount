@@ -2,6 +2,8 @@ namespace LogMount.Models;
 
 public class LogFilterCriteria
 {
+    public string? Date { get; set; }
+    public string? Line { get; set; }
     public string? Language { get; set; }
     public string? OccurrenceTime { get; set; }
     public string? LotName { get; set; }
@@ -20,6 +22,8 @@ public class LogFilterCriteria
     public string? ErrorVacuum { get; set; }
 
     public bool HasAnyFilter =>
+        !string.IsNullOrWhiteSpace(Date) ||
+        !string.IsNullOrWhiteSpace(Line) ||
         !string.IsNullOrWhiteSpace(Language) ||
         !string.IsNullOrWhiteSpace(OccurrenceTime) ||
         !string.IsNullOrWhiteSpace(LotName) ||

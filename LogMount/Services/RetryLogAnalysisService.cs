@@ -12,6 +12,8 @@ public static class RetryLogAnalysisService
     {
         IEnumerable<RetryLogEntry> query = entries;
 
+        query = ApplyContainsFilter(query, criteria.Date, e => e.Date);
+        query = ApplyContainsFilter(query, criteria.Line, e => e.Line);
         query = ApplyContainsFilter(query, criteria.Language, e => e.Language);
         query = ApplyContainsFilter(query, criteria.OccurrenceTime, e => e.OccurrenceTime);
         query = ApplyContainsFilter(query, criteria.LotName, e => e.LotName);
@@ -41,6 +43,8 @@ public static class RetryLogAnalysisService
                 ErrorName = string.IsNullOrWhiteSpace(g.Key.ErrorName) ? "(Không có tên lỗi)" : g.Key.ErrorName,
                 ErrorNo = g.Key.ErrorNo,
                 Count = g.Count(),
+                Dates = DistinctValues(g, e => e.Date),
+                Lines = DistinctValues(g, e => e.Line),
                 OccurrenceTimes = DistinctValues(g, e => e.OccurrenceTime),
                 LotNames = DistinctValues(g, e => e.LotName),
                 Lanes = DistinctValues(g, e => e.Lane),
@@ -64,6 +68,8 @@ public static class RetryLogAnalysisService
     {
         return
         [
+            BuildColumnSummary("Date", entries, e => e.Date),
+            BuildColumnSummary("Line", entries, e => e.Line),
             BuildColumnSummary("Language", entries, e => e.Language),
             BuildColumnSummary("Occurrence Time", entries, e => e.OccurrenceTime),
             BuildColumnSummary("Lot Name", entries, e => e.LotName),
