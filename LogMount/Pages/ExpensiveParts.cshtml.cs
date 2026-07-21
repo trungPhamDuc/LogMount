@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LogMount.Models;
 using LogMount.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,12 @@ namespace LogMount.Pages;
 
 public class ExpensivePartsModel : PageModel
 {
+    private static readonly int[] TopNOptions = [10, 20, 30];
+    private static readonly JsonSerializerOptions ChartJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly ILogDataStore _logDataStore;
     private readonly IPartDataStore _partDataStore;
     private readonly ILogExportService _exportService;
@@ -21,12 +28,25 @@ public class ExpensivePartsModel : PageModel
         _exportService = exportService;
     }
 
+    [BindProperty(SupportsGet = true)]
+    public ExpensivePartFilterCriteria Filter { get; set; } = new();
+
+    [BindProperty(SupportsGet = true)]
+    public int TopN { get; set; } = 10;
+
     public IReadOnlyList<ExpensivePartSummaryItem> Summary { get; set; } = [];
+    public IReadOnlyList<ExpensivePartSummaryItem> FilteredSummary { get; set; } = [];
+    public IReadOnlyList<ExpensivePartTopItem> TopParts { get; set; } = [];
+    public IReadOnlyList<int> TopNChoices { get; } = TopNOptions;
     public string? LogFileName { get; set; }
     public string? PartFileName { get; set; }
     public int LogRecordCount { get; set; }
     public int PartCount { get; set; }
     public int TotalErrorCount { get; set; }
+    public int FilteredErrorCount { get; set; }
+    public bool IsFiltered => Filter.HasAnyFilter;
+    public string ChartDataJson { get; set; } = "[]";
+    public string DetailDataJson { get; set; } = "[]";
     public string? ErrorMessage { get; set; }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
@@ -48,7 +68,7 @@ public class ExpensivePartsModel : PageModel
             return loadResult;
         }
 
-        if (Summary.Count == 0)
+        if (FilteredSummary.Count == 0)
         {
             return BadRequest("Không có dữ liệu để tải xuống.");
         }
@@ -59,11 +79,25 @@ public class ExpensivePartsModel : PageModel
         }
 
         var exportResult = _exportService.ExportExpensiveParts(
-            Summary,
+            FilteredSummary,
             exportFormat,
             PartFileName ?? "part-lkdt");
 
         return File(exportResult.Content, exportResult.ContentType, exportResult.FileName);
+    }
+
+    public Dictionary<string, string?> GetExportRouteValues(string format)
+    {
+        return new Dictionary<string, string?>
+        {
+            ["format"] = format,
+            ["Filter.PartsName"] = Filter.PartsName,
+            ["Filter.Line"] = Filter.Line,
+            ["Filter.Machine"] = Filter.Machine,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.SortDirection"] = Filter.SortDirection,
+            ["TopN"] = TopN.ToString()
+        };
     }
 
     private async Task<IActionResult?> LoadSummaryAsync(CancellationToken cancellationToken)
@@ -110,6 +144,19 @@ public class ExpensivePartsModel : PageModel
         PartCount = partSession.PartNames.Count;
         Summary = ExpensivePartAnalysisService.Summarize(logSession.Entries, partSession.PartNames);
         TotalErrorCount = Summary.Sum(x => x.Count);
+
+        TopN = TopNOptions.Contains(TopN) ? TopN : 10;
+
+        var filtered = ExpensivePartAnalysisService.Filter(Summary, Filter);
+        FilteredSummary = ExpensivePartAnalysisService.SortByCount(filtered, Filter.IsDescending);
+        FilteredErrorCount = FilteredSummary.Sum(x => x.Count);
+        TopParts = ExpensivePartAnalysisService.GetTopParts(filtered, TopN);
+
+        ChartDataJson = JsonSerializer.Serialize(TopParts.Select(x => new
+        {
+            x.PartsName,
+            x.TotalCount
+        }), ChartJsonOptions);
 
         return null;
     }

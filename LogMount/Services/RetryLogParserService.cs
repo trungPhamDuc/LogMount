@@ -1,14 +1,27 @@
 using System.Globalization;
 using System.Text;
-using ClosedXML.Excel;
+using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
+using ExcelDataReader;
 using LogMount.Models;
 
 namespace LogMount.Services;
 
 public class RetryLogParserService : IRetryLogParserService
 {
+    private static readonly string[] HeaderKeywords =
+    [
+        "Occurrence Time", "Lot Name", "Error No.", "Error Name", "Parts Name", "Parts No."
+    ];
+
+    private static readonly Regex VersionPattern = new(@"^V\d+(\.\d+)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    static RetryLogParserService()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     public async Task<IReadOnlyList<RetryLogEntry>> ParseAsync(
         Stream stream,
         string fileName,
@@ -28,27 +41,36 @@ public class RetryLogParserService : IRetryLogParserService
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         var content = await reader.ReadToEndAsync(cancellationToken);
-        var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.RemoveEmptyEntries);
+        var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
 
-        if (lines.Length < 3)
+        var (headerLineIndex, headers) = FindHeaderLine(lines);
+        if (headerLineIndex < 0)
         {
-            throw new InvalidOperationException("File CSV không có dữ liệu hợp lệ.");
+            throw new InvalidOperationException("Không tìm thấy dòng tiêu đề cột trong file CSV.");
         }
 
-        var headerLine = lines[1];
-        var headers = SplitCsvLine(headerLine);
         var columnMap = BuildColumnMap(headers);
-
         var entries = new List<RetryLogEntry>();
-        for (var i = 2; i < lines.Length; i++)
+
+        for (var i = headerLineIndex + 1; i < lines.Length; i++)
         {
-            var values = SplitCsvLine(lines[i]);
-            if (values.All(string.IsNullOrWhiteSpace))
+            if (string.IsNullOrWhiteSpace(lines[i]))
             {
                 continue;
             }
 
-            entries.Add(MapRow(values, columnMap));
+            var values = SplitCsvLine(lines[i]);
+            if (!TryCreateEntry(values, columnMap, out var entry))
+            {
+                continue;
+            }
+
+            entries.Add(entry);
+        }
+
+        if (entries.Count == 0)
+        {
+            throw new InvalidOperationException("File CSV không có dữ liệu hợp lệ.");
         }
 
         return entries;
@@ -56,37 +78,188 @@ public class RetryLogParserService : IRetryLogParserService
 
     private static IReadOnlyList<RetryLogEntry> ParseExcel(Stream stream)
     {
-        using var workbook = new XLWorkbook(stream);
-        var worksheet = workbook.Worksheets.First();
-        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 0;
-
-        if (lastRow < 3)
-        {
-            throw new InvalidOperationException("File Excel không có dữ liệu hợp lệ.");
-        }
-
-        var headerRow = worksheet.Row(2);
-        var headers = headerRow.CellsUsed().Select(c => c.GetString().Trim()).ToList();
-        var columnMap = BuildColumnMap(headers);
-
+        using var reader = ExcelReaderFactory.CreateReader(stream);
         var entries = new List<RetryLogEntry>();
-        for (var row = 3; row <= lastRow; row++)
-        {
-            var values = new List<string>();
-            for (var col = 1; col <= headers.Count; col++)
-            {
-                values.Add(worksheet.Cell(row, col).GetFormattedString().Trim());
-            }
+        Dictionary<string, int>? columnMap = null;
+        var maxColumnCount = 0;
 
+        while (reader.Read())
+        {
+            var values = ReadRowValues(reader);
             if (values.All(string.IsNullOrWhiteSpace))
             {
                 continue;
             }
 
-            entries.Add(MapRow(values, columnMap));
+            if (columnMap is null)
+            {
+                if (!IsHeaderRow(values))
+                {
+                    continue;
+                }
+
+                columnMap = BuildColumnMap(values);
+                maxColumnCount = Math.Max(maxColumnCount, values.Length);
+                continue;
+            }
+
+            if (values.Length < maxColumnCount)
+            {
+                values = PadValues(values, maxColumnCount);
+            }
+
+            if (TryCreateEntry(values, columnMap, out var entry))
+            {
+                entries.Add(entry);
+            }
+        }
+
+        if (entries.Count == 0)
+        {
+            throw new InvalidOperationException("File Excel không có dữ liệu hợp lệ.");
         }
 
         return entries;
+    }
+
+    private static (int LineIndex, IReadOnlyList<string> Headers) FindHeaderLine(string[] lines)
+    {
+        var scanLimit = Math.Min(lines.Length, 40);
+        for (var i = 0; i < scanLimit; i++)
+        {
+            if (string.IsNullOrWhiteSpace(lines[i]))
+            {
+                continue;
+            }
+
+            var values = SplitCsvLine(lines[i]);
+            if (IsHeaderRow(values))
+            {
+                return (i, values);
+            }
+        }
+
+        return (-1, []);
+    }
+
+    private static bool TryCreateEntry(
+        IReadOnlyList<string> values,
+        IReadOnlyDictionary<string, int> columnMap,
+        out RetryLogEntry entry)
+    {
+        entry = new RetryLogEntry();
+
+        if (IsMetadataRow(values) || IsHeaderRow(values))
+        {
+            return false;
+        }
+
+        entry = MapRow(values, columnMap);
+        return IsValidDataRow(entry);
+    }
+
+    private static string[] ReadRowValues(IExcelDataReader reader)
+    {
+        var values = new string[reader.FieldCount];
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            values[i] = reader.GetValue(i)?.ToString()?.Trim() ?? string.Empty;
+        }
+
+        return values;
+    }
+
+    private static string[] PadValues(IReadOnlyList<string> values, int targetLength)
+    {
+        var padded = new string[targetLength];
+        for (var i = 0; i < targetLength; i++)
+        {
+            padded[i] = i < values.Count ? values[i] : string.Empty;
+        }
+
+        return padded;
+    }
+
+    private static bool IsHeaderRow(IReadOnlyList<string> values)
+    {
+        var texts = values
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => NormalizeHeader(v.Trim()))
+            .Where(v => !string.IsNullOrEmpty(v))
+            .ToList();
+
+        if (texts.Count == 0)
+        {
+            return false;
+        }
+
+        var matchCount = texts.Count(text =>
+            HeaderKeywords.Any(keyword => text.Equals(keyword, StringComparison.OrdinalIgnoreCase)));
+
+        return matchCount >= 2 ||
+               (texts.Contains("Language", StringComparer.OrdinalIgnoreCase) &&
+                texts.Contains("Lot Name", StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool IsMetadataRow(IReadOnlyList<string> values)
+    {
+        var texts = values
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v.Trim())
+            .ToList();
+
+        if (texts.Count == 0)
+        {
+            return true;
+        }
+
+        if (texts.All(IsMetadataValue))
+        {
+            return true;
+        }
+
+        return texts.Count <= 4 &&
+               texts.Any(v => v.Equals("MultiLanguage", StringComparison.OrdinalIgnoreCase) ||
+                              VersionPattern.IsMatch(v));
+    }
+
+    private static bool IsMetadataValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Equals("MultiLanguage", StringComparison.OrdinalIgnoreCase) ||
+               VersionPattern.IsMatch(trimmed);
+    }
+
+    private static bool IsValidDataRow(RetryLogEntry entry)
+    {
+        if (IsMetadataValue(entry.Language) ||
+            IsMetadataValue(entry.OccurrenceTime) ||
+            IsMetadataValue(entry.LotName) ||
+            IsMetadataValue(entry.ErrorName) ||
+            IsMetadataValue(entry.ErrorNo))
+        {
+            return false;
+        }
+
+        if (entry.Language.Equals("EN", StringComparison.OrdinalIgnoreCase) &&
+            entry.OccurrenceTime.Equals("Occurrence Time", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var hasLotName = !string.IsNullOrWhiteSpace(entry.LotName) &&
+                         entry.LotName.StartsWith("EBR", StringComparison.OrdinalIgnoreCase);
+        var hasOccurrenceTime = !string.IsNullOrWhiteSpace(entry.OccurrenceTime) &&
+                                (entry.OccurrenceTime.Contains('/') || entry.OccurrenceTime.Contains('-'));
+        var hasErrorNo = !string.IsNullOrWhiteSpace(entry.ErrorNo) &&
+                         entry.ErrorNo.All(char.IsDigit);
+
+        return hasLotName || (hasOccurrenceTime && hasErrorNo);
     }
 
     private static Dictionary<string, int> BuildColumnMap(IReadOnlyList<string> headers)
@@ -129,6 +302,7 @@ public class RetryLogParserService : IRetryLogParserService
 
         var lotName = GetValue("Lot Name");
         var occurrenceTime = GetValue("Occurrence Time");
+        var lineFromFile = GetValue("Line");
 
         return new RetryLogEntry
         {
@@ -136,7 +310,9 @@ public class RetryLogParserService : IRetryLogParserService
             OccurrenceTime = occurrenceTime,
             LotName = lotName,
             Date = LotNameParser.ExtractDate(occurrenceTime),
-            Line = LotNameParser.ParseLine(lotName),
+            Line = !string.IsNullOrWhiteSpace(lineFromFile)
+                ? lineFromFile
+                : LotNameParser.ParseLine(lotName),
             ErrorNo = GetValue("Error No."),
             ErrorName = GetValue("Error Name"),
             Lane = GetValue("Lane"),

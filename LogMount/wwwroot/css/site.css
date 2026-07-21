@@ -116,3 +116,17 @@ body {
 .upload-file-list .list-group-item + .list-group-item {
   border-top: 1px dashed #dee2e6;
 }
+
+.chart-wrapper {
+  position: relative;
+  min-height: 320px;
+  height: clamp(320px, 50vh, 560px);
+}
+
+.part-detail-link {
+  text-decoration: none;
+}
+
+.part-detail-link:hover {
+  text-decoration: underline;
+}

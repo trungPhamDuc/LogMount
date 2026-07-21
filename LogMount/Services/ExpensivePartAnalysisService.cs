@@ -56,4 +56,77 @@ public static class ExpensivePartAnalysisService
             .ThenBy(x => x.ErrorName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    public static IReadOnlyList<ExpensivePartSummaryItem> Filter(
+        IReadOnlyList<ExpensivePartSummaryItem> items,
+        ExpensivePartFilterCriteria criteria)
+    {
+        IEnumerable<ExpensivePartSummaryItem> query = items;
+
+        query = ApplyContainsFilter(query, criteria.PartsName, x => x.PartsName);
+        query = ApplyContainsFilter(query, criteria.Line, x => x.Line);
+        query = ApplyContainsFilter(query, criteria.Machine, x => x.Machine);
+        query = ApplyContainsFilter(query, criteria.ErrorName, x => x.ErrorName);
+
+        return query.ToList();
+    }
+
+    public static IReadOnlyList<ExpensivePartSummaryItem> SortByCount(
+        IReadOnlyList<ExpensivePartSummaryItem> items,
+        bool descending)
+    {
+        return descending
+            ? items.OrderByDescending(x => x.Count)
+                .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.ErrorName, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+            : items.OrderBy(x => x.Count)
+                .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.ErrorName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+    }
+
+    public static IReadOnlyList<ExpensivePartTopItem> GetTopParts(
+        IReadOnlyList<ExpensivePartSummaryItem> items,
+        int topN)
+    {
+        if (items.Count == 0 || topN <= 0)
+        {
+            return [];
+        }
+
+        var topItems = items
+            .GroupBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new ExpensivePartTopItem
+            {
+                PartsName = g.Key,
+                TotalCount = g.Sum(x => x.Count),
+                ErrorGroupCount = g.Count()
+            })
+            .OrderByDescending(x => x.TotalCount)
+            .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+            .Take(topN)
+            .ToList();
+
+        for (var i = 0; i < topItems.Count; i++)
+        {
+            topItems[i].Rank = i + 1;
+        }
+
+        return topItems;
+    }
+
+    private static IEnumerable<ExpensivePartSummaryItem> ApplyContainsFilter(
+        IEnumerable<ExpensivePartSummaryItem> query,
+        string? value,
+        Func<ExpensivePartSummaryItem, string> selector)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return query;
+        }
+
+        var trimmed = value.Trim();
+        return query.Where(x => selector(x).Contains(trimmed, StringComparison.OrdinalIgnoreCase));
+    }
 }

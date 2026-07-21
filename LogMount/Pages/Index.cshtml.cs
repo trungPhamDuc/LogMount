@@ -1,14 +1,24 @@
 using LogMount.Models;
 using LogMount.Services;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LogMount.Pages;
 
+internal static class IndexUploadLimits
+{
+    public const long MaxFileSize = 200L * 1024 * 1024;
+    public const long MaxTotalUploadSize = 500L * 1024 * 1024;
+}
+
+[RequestSizeLimit(IndexUploadLimits.MaxTotalUploadSize)]
+[RequestFormLimits(MultipartBodyLengthLimit = IndexUploadLimits.MaxTotalUploadSize, ValueLengthLimit = int.MaxValue)]
 public class IndexModel : PageModel
 {
     private const int PageSize = 50;
-    private const long MaxFileSize = 50 * 1024 * 1024;
+    private const long MaxFileSize = IndexUploadLimits.MaxFileSize;
+    private const long MaxTotalUploadSize = IndexUploadLimits.MaxTotalUploadSize;
 
     private readonly IRetryLogParserService _parserService;
     private readonly IPartListParserService _partListParserService;
@@ -71,6 +81,13 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        var totalSize = files.Sum(f => f.Length);
+        if (totalSize > MaxTotalUploadSize)
+        {
+            ErrorMessage = $"Tổng dung lượng file vượt quá giới hạn {MaxTotalUploadSize / (1024 * 1024)} MB.";
+            return Page();
+        }
+
         var allEntries = new List<RetryLogEntry>();
         var fileNames = new List<string>();
         var parseErrors = new List<string>();
@@ -79,7 +96,7 @@ public class IndexModel : PageModel
         {
             if (file.Length > MaxFileSize)
             {
-                parseErrors.Add($"\"{file.FileName}\": file quá lớn (tối đa 50 MB).");
+                parseErrors.Add($"\"{file.FileName}\": file quá lớn (tối đa {MaxFileSize / (1024 * 1024)} MB/file).");
                 continue;
             }
 
