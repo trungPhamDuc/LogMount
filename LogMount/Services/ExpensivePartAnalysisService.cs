@@ -16,7 +16,9 @@ public static class ExpensivePartAnalysisService
         var partSet = new HashSet<string>(expensivePartNames, StringComparer.OrdinalIgnoreCase);
 
         return logEntries
-            .Where(e => !string.IsNullOrWhiteSpace(e.PartsName) && partSet.Contains(e.PartsName))
+            .Where(e => !string.IsNullOrWhiteSpace(e.PartsName) &&
+                        partSet.Contains(e.PartsName) &&
+                        !IsVisionRetry(e.ErrorName))
             .Select(e =>
             {
                 var (lineNumber, side, machine) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
@@ -34,6 +36,8 @@ public static class ExpensivePartAnalysisService
                 x.LineNumber,
                 x.Side,
                 x.Machine,
+                x.Entry.Lane,
+                x.Entry.FeederNo,
                 x.Entry.ErrorNo,
                 x.Entry.ErrorName
             })
@@ -44,6 +48,8 @@ public static class ExpensivePartAnalysisService
                 Side = g.Key.Side,
                 SideLabel = LotNameParser.GetSideLabel(g.Key.Side),
                 Machine = g.Key.Machine,
+                Lane = g.Key.Lane,
+                FeederNo = g.Key.FeederNo,
                 ErrorNo = g.Key.ErrorNo,
                 ErrorName = string.IsNullOrWhiteSpace(g.Key.ErrorName) ? "(Không có tên lỗi)" : g.Key.ErrorName,
                 Count = g.Count()
@@ -73,17 +79,36 @@ public static class ExpensivePartAnalysisService
 
     public static IReadOnlyList<ExpensivePartSummaryItem> SortByCount(
         IReadOnlyList<ExpensivePartSummaryItem> items,
-        bool descending)
+        ExpensivePartFilterCriteria criteria)
     {
-        return descending
-            ? items.OrderByDescending(x => x.Count)
-                .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(x => x.ErrorName, StringComparer.OrdinalIgnoreCase)
-                .ToList()
-            : items.OrderBy(x => x.Count)
-                .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(x => x.ErrorName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+        if (criteria.IsCountSort)
+        {
+            return criteria.IsDescending
+                ? items.OrderByDescending(x => x.Count)
+                    .ThenBy(x => GetLineSortOrder(x.Line))
+                    .ThenBy(x => GetSideSortOrder(x.Side))
+                    .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                : items.OrderBy(x => x.Count)
+                    .ThenBy(x => GetLineSortOrder(x.Line))
+                    .ThenBy(x => GetSideSortOrder(x.Side))
+                    .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+        }
+
+        var orderedItems = items
+            .OrderBy(x => GetLineSortOrder(x.Line))
+            .ThenBy(x => x.Line, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => GetSideSortOrder(x.Side))
+            .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase);
+
+        return orderedItems
+            .ThenByDescending(x => x.Count)
+            .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.ErrorName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public static IReadOnlyList<ExpensivePartTopItem> GetTopParts(
@@ -129,4 +154,20 @@ public static class ExpensivePartAnalysisService
         var trimmed = value.Trim();
         return query.Where(x => selector(x).Contains(trimmed, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool IsVisionRetry(string? errorName) =>
+        string.Equals(errorName?.Trim(), "Vision Retry", StringComparison.OrdinalIgnoreCase);
+
+    private static int GetLineSortOrder(string? line)
+    {
+        var value = line?.Trim() ?? string.Empty;
+        return value.StartsWith("L", StringComparison.OrdinalIgnoreCase) &&
+               int.TryParse(value[1..], out var lineNumber)
+            ? lineNumber
+            : int.MaxValue;
+    }
+
+    private static int GetSideSortOrder(string? side) =>
+        side?.Trim().Equals("B", StringComparison.OrdinalIgnoreCase) == true ? 0 :
+        side?.Trim().Equals("T", StringComparison.OrdinalIgnoreCase) == true ? 1 : 2;
 }

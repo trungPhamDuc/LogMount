@@ -148,7 +148,7 @@ public class ExpensivePartsModel : PageModel
         TopN = TopNOptions.Contains(TopN) ? TopN : 10;
 
         var filtered = ExpensivePartAnalysisService.Filter(Summary, Filter);
-        FilteredSummary = ExpensivePartAnalysisService.SortByCount(filtered, Filter.IsDescending);
+        FilteredSummary = ExpensivePartAnalysisService.SortByCount(filtered, Filter);
         FilteredErrorCount = FilteredSummary.Sum(x => x.Count);
         TopParts = ExpensivePartAnalysisService.GetTopParts(filtered, TopN);
 

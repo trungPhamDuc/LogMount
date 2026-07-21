@@ -35,7 +35,7 @@ public class LogExportService : ILogExportService
 
     private static readonly string[] ExpensivePartHeaders =
     [
-        "Parts Name", "Line", "Mặt", "Máy", "Error No.", "Error Name", "Số lần"
+        "Parts Name", "Line", "Mặt", "Máy", "Lane", "Feeder No.", "Error No.", "Error Name", "Số lần"
     ];
 
     public FileExportResult ExportOverview(IReadOnlyList<ColumnSummaryItem> items, ExportFormat format, string baseFileName)
@@ -105,15 +105,22 @@ public class LogExportService : ILogExportService
     public FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName)
     {
         var rows = items.Select(item => new string[]
-        {
-            item.PartsName,
-            item.Line,
-            item.SideLabel,
-            item.Machine,
-            item.ErrorNo,
-            item.ErrorName,
-            item.Count.ToString(CultureInfo.InvariantCulture)
-        });
+            {
+                item.PartsName,
+                item.Line,
+                item.SideLabel,
+                item.Machine,
+                item.Lane,
+                item.FeederNo,
+                item.ErrorNo,
+                item.ErrorName,
+                item.Count.ToString(CultureInfo.InvariantCulture)
+            })
+            .Append([
+                "Tổng cộng (đã lọc)", string.Empty, string.Empty, string.Empty,
+                string.Empty, string.Empty, string.Empty, string.Empty,
+                items.Sum(item => item.Count).ToString(CultureInfo.InvariantCulture)
+            ]);
 
         return Export("linh-kien-dat-tien", ExpensivePartHeaders, rows, format, baseFileName);
     }

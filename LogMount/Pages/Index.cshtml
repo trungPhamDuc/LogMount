@@ -418,16 +418,30 @@
 
                 @if (Model.TotalPages > 1)
                 {
+                    var visiblePages = Enumerable.Range(1, Model.TotalPages)
+                        .Where(page => page <= 2 ||
+                                       page >= Model.TotalPages - 1 ||
+                                       Math.Abs(page - Model.PageNumber) <= 2)
+                        .ToList();
+                    var previousPage = 0;
+
                     <nav class="mt-3" aria-label="Phân trang">
                         <ul class="pagination pagination-sm justify-content-center mb-0">
                             <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : "")">
                                 <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(Model.PageNumber - 1)">Trước</a>
                             </li>
-                            @for (var i = 1; i <= Model.TotalPages; i++)
+                            @foreach (var page in visiblePages)
                             {
-                                <li class="page-item @(i == Model.PageNumber ? "active" : "")">
-                                    <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(i)">@i</a>
+                                @if (page - previousPage > 1)
+                                {
+                                    <li class="page-item disabled" aria-hidden="true">
+                                        <span class="page-link">…</span>
+                                    </li>
+                                }
+                                <li class="page-item @(page == Model.PageNumber ? "active" : "")">
+                                    <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(page)">@(page)</a>
                                 </li>
+                                previousPage = page;
                             }
                             <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
                                 <a class="page-link" asp-page="./Index" asp-all-route-data="@Model.GetPaginationRouteValues(Model.PageNumber + 1)">Sau</a>
