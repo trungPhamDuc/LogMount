@@ -21,6 +21,7 @@ public class IndexModel : PageModel
     private const long MaxTotalUploadSize = IndexUploadLimits.MaxTotalUploadSize;
 
     private readonly IRetryLogParserService _parserService;
+    private readonly IRetryLogBatchService _retryLogBatchService;
     private readonly IPartListParserService _partListParserService;
     private readonly ILogDataStore _logDataStore;
     private readonly IPartDataStore _partDataStore;
@@ -29,6 +30,7 @@ public class IndexModel : PageModel
 
     public IndexModel(
         IRetryLogParserService parserService,
+        IRetryLogBatchService retryLogBatchService,
         IPartListParserService partListParserService,
         ILogDataStore logDataStore,
         IPartDataStore partDataStore,
@@ -36,6 +38,7 @@ public class IndexModel : PageModel
         ILogger<IndexModel> logger)
     {
         _parserService = parserService;
+        _retryLogBatchService = retryLogBatchService;
         _partListParserService = partListParserService;
         _logDataStore = logDataStore;
         _partDataStore = partDataStore;
@@ -45,6 +48,9 @@ public class IndexModel : PageModel
 
     [BindProperty]
     public List<IFormFile> UploadFiles { get; set; } = [];
+
+    [BindProperty]
+    public DateOnly? RetryLogDate { get; set; }
 
     [BindProperty]
     public IFormFile? PartListFile { get; set; }
@@ -162,6 +168,48 @@ public class IndexModel : PageModel
         }
     }
 
+    public async Task<IActionResult> OnPostLoadRetryLogAsync(CancellationToken cancellationToken)
+    {
+        if (RetryLogDate is null)
+        {
+            TempData["ErrorMessage"] = "Vui lòng chọn ngày cần lấy retry log.";
+            return RedirectToPage();
+        }
+
+        try
+        {
+            var outputFilePath = await _retryLogBatchService.RunAsync(RetryLogDate.Value, cancellationToken);
+            await using var stream = System.IO.File.OpenRead(outputFilePath);
+            var entries = await _parserService.ParseAsync(stream, Path.GetFileName(outputFilePath), cancellationToken);
+
+            if (entries.Count == 0)
+            {
+                TempData["ErrorMessage"] = "File retry log tổng hợp không có dữ liệu hợp lệ.";
+                return RedirectToPage();
+            }
+
+            await HttpContext.Session.LoadAsync(cancellationToken);
+            var dataKey = Guid.NewGuid().ToString("N");
+            _logDataStore.Save(dataKey, entries, [Path.GetFileName(outputFilePath)]);
+            HttpContext.Session.SetString(SessionKeys.LogDataKey, dataKey);
+            await HttpContext.Session.CommitAsync(cancellationToken);
+
+            TempData["StatusMessage"] = $"Đã tổng hợp và tải {entries.Count:N0} dòng retry log ngày {RetryLogDate.Value:dd/MM/yyyy}.";
+            return RedirectToPage(new { PageNumber = 1 });
+        }
+        catch (OperationCanceledException)
+        {
+            TempData["ErrorMessage"] = "Đã hủy quá trình tổng hợp retry log.";
+            return RedirectToPage();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load retry log for {RetryLogDate}.", RetryLogDate);
+            TempData["ErrorMessage"] = $"Không thể tổng hợp retry log: {ex.Message}";
+            return RedirectToPage();
+        }
+    }
+
     public async Task<IActionResult> OnPostClearAsync(CancellationToken cancellationToken)
     {
         await HttpContext.Session.LoadAsync(cancellationToken);
@@ -244,6 +292,7 @@ public class IndexModel : PageModel
     {
         StatusMessage = TempData["StatusMessage"] as string;
         ErrorMessage = TempData["ErrorMessage"] as string;
+        RetryLogDate ??= DateOnly.FromDateTime(DateTime.Today);
 
         await HttpContext.Session.LoadAsync(cancellationToken);
 
