@@ -1,72 +1,57 @@
+using System.Globalization;
 using ClosedXML.Excel;
+using LogMount.Models;
 
 namespace LogMount.Services;
 
 public class PartListParserService : IPartListParserService
 {
-    public Task<IReadOnlyList<string>> ParseAsync(
+    public Task<IReadOnlyList<ExpensivePart>> ParseAsync(
         Stream stream,
         string fileName,
         CancellationToken cancellationToken = default)
     {
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
-
-        IReadOnlyList<string> partNames = extension switch
+        IReadOnlyList<ExpensivePart> parts = extension switch
         {
             ".xlsx" or ".xls" => ParseExcel(stream),
             ".csv" => ParseCsv(stream),
             _ => throw new InvalidOperationException("Chỉ hỗ trợ file .xlsx, .xls hoặc .csv.")
         };
 
-        return Task.FromResult(partNames);
+        return Task.FromResult(parts);
     }
 
-    private static IReadOnlyList<string> ParseExcel(Stream stream)
+    private static IReadOnlyList<ExpensivePart> ParseExcel(Stream stream)
     {
         using var workbook = new XLWorkbook(stream);
         var worksheet = workbook.Worksheets.First();
         var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 0;
-
-        if (lastRow == 0)
-        {
-            throw new InvalidOperationException("File Excel không có dữ liệu.");
-        }
-
-        var partNames = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var parts = new Dictionary<string, ExpensivePart>(StringComparer.OrdinalIgnoreCase);
 
         for (var row = 1; row <= lastRow; row++)
         {
-            var value = worksheet.Cell(row, 1).GetFormattedString().Trim();
-            if (string.IsNullOrWhiteSpace(value))
+            var partsName = worksheet.Cell(row, 1).GetFormattedString().Trim();
+            if (string.IsNullOrWhiteSpace(partsName) || IsHeaderValue(partsName))
             {
                 continue;
             }
 
-            if (IsHeaderValue(value))
+            var costText = worksheet.Cell(row, 3).GetFormattedString().Trim();
+            parts[partsName] = new ExpensivePart
             {
-                continue;
-            }
-
-            if (seen.Add(value))
-            {
-                partNames.Add(value);
-            }
+                PartsName = partsName,
+                Cost = ParseCost(costText)
+            };
         }
 
-        if (partNames.Count == 0)
-        {
-            throw new InvalidOperationException("Không tìm thấy part name trong cột A.");
-        }
-
-        return partNames;
+        return EnsurePartsFound(parts.Values, "cột A");
     }
 
-    private static IReadOnlyList<string> ParseCsv(Stream stream)
+    private static IReadOnlyList<ExpensivePart> ParseCsv(Stream stream)
     {
         using var reader = new StreamReader(stream, leaveOpen: true);
-        var partNames = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var parts = new Dictionary<string, ExpensivePart>(StringComparer.OrdinalIgnoreCase);
 
         while (!reader.EndOfStream)
         {
@@ -76,24 +61,48 @@ public class PartListParserService : IPartListParserService
                 continue;
             }
 
-            var value = line.Split(',')[0].Trim().Trim('"');
-            if (string.IsNullOrWhiteSpace(value) || IsHeaderValue(value))
+            var values = line.Split(',');
+            var partsName = values.ElementAtOrDefault(0)?.Trim().Trim('"') ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(partsName) || IsHeaderValue(partsName))
             {
                 continue;
             }
 
-            if (seen.Add(value))
+            parts[partsName] = new ExpensivePart
             {
-                partNames.Add(value);
-            }
+                PartsName = partsName,
+                Cost = ParseCost(values.ElementAtOrDefault(2)?.Trim().Trim('"') ?? string.Empty)
+            };
         }
 
-        if (partNames.Count == 0)
+        return EnsurePartsFound(parts.Values, "file CSV");
+    }
+
+    private static IReadOnlyList<ExpensivePart> EnsurePartsFound(
+        IEnumerable<ExpensivePart> parts,
+        string source)
+    {
+        var result = parts.ToList();
+        if (result.Count == 0)
         {
-            throw new InvalidOperationException("Không tìm thấy part name trong file CSV.");
+            throw new InvalidOperationException($"Không tìm thấy part name trong {source}.");
         }
 
-        return partNames;
+        return result;
+    }
+
+    private static decimal ParseCost(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 0;
+        }
+
+        var styles = NumberStyles.Number | NumberStyles.AllowCurrencySymbol;
+        return decimal.TryParse(value, styles, CultureInfo.InvariantCulture, out var cost) ||
+               decimal.TryParse(value, styles, CultureInfo.GetCultureInfo("vi-VN"), out cost)
+            ? cost
+            : 0;
     }
 
     private static bool IsHeaderValue(string value)

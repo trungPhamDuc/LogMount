@@ -3,6 +3,8 @@ namespace LogMount.Models;
 public class ExpensivePartSummaryItem
 {
     public string PartsName { get; set; } = string.Empty;
+    public decimal Cost { get; set; }
+    public decimal TotalCost => Cost * Count;
     public string Line { get; set; } = string.Empty;
     public string Side { get; set; } = string.Empty;
     public string SideLabel { get; set; } = string.Empty;

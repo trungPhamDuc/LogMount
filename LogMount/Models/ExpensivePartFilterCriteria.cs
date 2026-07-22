@@ -18,6 +18,13 @@ public class ExpensivePartFilterCriteria
         SortDirection.Equals("desc", StringComparison.OrdinalIgnoreCase) ||
         SortDirection.Equals("asc", StringComparison.OrdinalIgnoreCase);
 
+    public bool IsCostSort =>
+        SortDirection.Equals("cost-desc", StringComparison.OrdinalIgnoreCase) ||
+        SortDirection.Equals("cost-asc", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsCostDescending =>
+        !SortDirection.Equals("cost-asc", StringComparison.OrdinalIgnoreCase);
+
     public bool IsDescending =>
         !SortDirection.Equals("asc", StringComparison.OrdinalIgnoreCase);
 }

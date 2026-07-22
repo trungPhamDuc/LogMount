@@ -35,7 +35,7 @@ public class LogExportService : ILogExportService
 
     private static readonly string[] ExpensivePartHeaders =
     [
-        "Parts Name", "Line", "Mặt", "Máy", "Lane", "Feeder No.", "Error No.", "Error Name", "Số lần"
+        "Parts Name", "Giá 1 con", "Tổng giá tiền", "Line", "Mặt", "Máy", "Lane", "Feeder No.", "Error No.", "Error Name", "Số lần"
     ];
 
     public FileExportResult ExportOverview(IReadOnlyList<ColumnSummaryItem> items, ExportFormat format, string baseFileName)
@@ -106,8 +106,10 @@ public class LogExportService : ILogExportService
     {
         var rows = items.Select(item => new string[]
             {
-                item.PartsName,
-                item.Line,
+            item.PartsName,
+            item.Cost.ToString("F2", CultureInfo.InvariantCulture),
+            item.TotalCost.ToString("F2", CultureInfo.InvariantCulture),
+            item.Line,
                 item.SideLabel,
                 item.Machine,
                 item.Lane,
@@ -117,12 +119,40 @@ public class LogExportService : ILogExportService
                 item.Count.ToString(CultureInfo.InvariantCulture)
             })
             .Append([
-                "Tổng cộng (đã lọc)", string.Empty, string.Empty, string.Empty,
-                string.Empty, string.Empty, string.Empty, string.Empty,
+                "Tổng cộng (đã lọc)", string.Empty,
+                items.Sum(item => item.TotalCost).ToString("F2", CultureInfo.InvariantCulture),
+                string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
+                string.Empty, string.Empty,
                 items.Sum(item => item.Count).ToString(CultureInfo.InvariantCulture)
             ]);
 
-        return Export("linh-kien-dat-tien", ExpensivePartHeaders, rows, format, baseFileName);
+        var webHeaders = new[]
+        {
+            "Parts Name", "Line", "Mặt", "Máy", "Lane", "Feeder", "Error No.", "Error Name", "Tổng giá tiền", "Số lần"
+        };
+
+        var webRows = items.Select(item => new string[]
+            {
+                item.PartsName,
+                item.Line,
+                $"{item.SideLabel} ({item.Side})",
+                item.Machine,
+                item.Lane,
+                item.FeederNo,
+                item.ErrorNo,
+                item.ErrorName,
+                item.TotalCost.ToString("F2", CultureInfo.InvariantCulture),
+                item.Count.ToString(CultureInfo.InvariantCulture)
+            })
+            .Append([
+                "Tổng cộng (đã lọc)",
+                string.Empty, string.Empty, string.Empty, string.Empty,
+                string.Empty, string.Empty, string.Empty,
+                items.Sum(item => item.TotalCost).ToString("F2", CultureInfo.InvariantCulture),
+                items.Sum(item => item.Count).ToString(CultureInfo.InvariantCulture)
+            ]);
+
+        return Export("linh-kien-dat-tien", webHeaders, webRows, format, baseFileName);
     }
 
     private static FileExportResult Export(

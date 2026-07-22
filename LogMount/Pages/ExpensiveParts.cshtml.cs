@@ -141,8 +141,8 @@ public class ExpensivePartsModel : PageModel
         LogFileName = logSession.FileName;
         PartFileName = partSession.FileName;
         LogRecordCount = logSession.Entries.Count;
-        PartCount = partSession.PartNames.Count;
-        Summary = ExpensivePartAnalysisService.Summarize(logSession.Entries, partSession.PartNames);
+        PartCount = partSession.Parts.Count;
+        Summary = ExpensivePartAnalysisService.Summarize(logSession.Entries, partSession.Parts);
         TotalErrorCount = Summary.Sum(x => x.Count);
 
         TopN = TopNOptions.Contains(TopN) ? TopN : 10;
@@ -150,7 +150,7 @@ public class ExpensivePartsModel : PageModel
         var filtered = ExpensivePartAnalysisService.Filter(Summary, Filter);
         FilteredSummary = ExpensivePartAnalysisService.SortByCount(filtered, Filter);
         FilteredErrorCount = FilteredSummary.Sum(x => x.Count);
-        TopParts = ExpensivePartAnalysisService.GetTopParts(filtered, TopN);
+        TopParts = ExpensivePartAnalysisService.GetTopParts(filtered, TopN, Filter.IsCostSort);
 
         ChartDataJson = JsonSerializer.Serialize(TopParts.Select(x => new
         {

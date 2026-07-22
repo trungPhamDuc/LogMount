@@ -6,18 +6,21 @@ public static class ExpensivePartAnalysisService
 {
     public static IReadOnlyList<ExpensivePartSummaryItem> Summarize(
         IReadOnlyList<RetryLogEntry> logEntries,
-        IReadOnlyList<string> expensivePartNames)
+        IReadOnlyList<ExpensivePart> expensiveParts)
     {
-        if (logEntries.Count == 0 || expensivePartNames.Count == 0)
+        if (logEntries.Count == 0 || expensiveParts.Count == 0)
         {
             return [];
         }
 
-        var partSet = new HashSet<string>(expensivePartNames, StringComparer.OrdinalIgnoreCase);
+        var costsByPartName = expensiveParts.ToDictionary(
+            part => part.PartsName,
+            part => part.Cost,
+            StringComparer.OrdinalIgnoreCase);
 
         return logEntries
             .Where(e => !string.IsNullOrWhiteSpace(e.PartsName) &&
-                        partSet.Contains(e.PartsName) &&
+                        costsByPartName.ContainsKey(e.PartsName) &&
                         !IsVisionRetry(e.ErrorName))
             .Select(e =>
             {
@@ -33,6 +36,7 @@ public static class ExpensivePartAnalysisService
             .GroupBy(x => new
             {
                 x.Entry.PartsName,
+                Cost = costsByPartName[x.Entry.PartsName],
                 x.LineNumber,
                 x.Side,
                 x.Machine,
@@ -44,6 +48,7 @@ public static class ExpensivePartAnalysisService
             .Select(g => new ExpensivePartSummaryItem
             {
                 PartsName = g.Key.PartsName,
+                Cost = g.Key.Cost,
                 Line = g.Key.LineNumber,
                 Side = g.Key.Side,
                 SideLabel = LotNameParser.GetSideLabel(g.Key.Side),
@@ -81,6 +86,19 @@ public static class ExpensivePartAnalysisService
         IReadOnlyList<ExpensivePartSummaryItem> items,
         ExpensivePartFilterCriteria criteria)
     {
+        if (criteria.IsCostSort)
+        {
+            return criteria.IsCostDescending
+                ? items.OrderByDescending(x => x.TotalCost)
+                    .ThenByDescending(x => x.Count)
+                    .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                : items.OrderBy(x => x.TotalCost)
+                    .ThenByDescending(x => x.Count)
+                    .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+        }
+
         if (criteria.IsCountSort)
         {
             return criteria.IsDescending
@@ -113,7 +131,8 @@ public static class ExpensivePartAnalysisService
 
     public static IReadOnlyList<ExpensivePartTopItem> GetTopParts(
         IReadOnlyList<ExpensivePartSummaryItem> items,
-        int topN)
+        int topN,
+        bool sortByCost)
     {
         if (items.Count == 0 || topN <= 0)
         {
@@ -125,20 +144,30 @@ public static class ExpensivePartAnalysisService
             .Select(g => new ExpensivePartTopItem
             {
                 PartsName = g.Key,
+                Cost = g.First().Cost,
                 TotalCount = g.Sum(x => x.Count),
+                TotalCost = g.Sum(x => x.TotalCost),
                 ErrorGroupCount = g.Count()
             })
-            .OrderByDescending(x => x.TotalCount)
-            .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
-            .Take(topN)
             .ToList();
 
-        for (var i = 0; i < topItems.Count; i++)
+        var sortedTopItems = sortByCost
+            ? topItems.OrderByDescending(x => x.TotalCost)
+                .ThenByDescending(x => x.TotalCount)
+                .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                .Take(topN)
+                .ToList()
+            : topItems.OrderByDescending(x => x.TotalCount)
+                .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
+                .Take(topN)
+                .ToList();
+
+        for (var i = 0; i < sortedTopItems.Count; i++)
         {
-            topItems[i].Rank = i + 1;
+            sortedTopItems[i].Rank = i + 1;
         }
 
-        return topItems;
+        return sortedTopItems;
     }
 
     private static IEnumerable<ExpensivePartSummaryItem> ApplyContainsFilter(

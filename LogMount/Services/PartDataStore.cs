@@ -1,10 +1,11 @@
+using LogMount.Models;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace LogMount.Services;
 
 public interface IPartDataStore
 {
-    void Save(string sessionId, IReadOnlyList<string> partNames, string fileName);
+    void Save(string sessionId, IReadOnlyList<ExpensivePart> parts, string fileName);
     PartDataSession? Get(string sessionId);
     void Clear(string sessionId);
 }
@@ -12,7 +13,7 @@ public interface IPartDataStore
 public class PartDataSession
 {
     public string FileName { get; set; } = string.Empty;
-    public IReadOnlyList<string> PartNames { get; set; } = [];
+    public IReadOnlyList<ExpensivePart> Parts { get; set; } = [];
     public DateTime UploadedAt { get; set; }
 }
 
@@ -26,12 +27,12 @@ public class MemoryPartDataStore : IPartDataStore
         _cache = cache;
     }
 
-    public void Save(string sessionId, IReadOnlyList<string> partNames, string fileName)
+    public void Save(string sessionId, IReadOnlyList<ExpensivePart> parts, string fileName)
     {
         var session = new PartDataSession
         {
             FileName = fileName,
-            PartNames = partNames.ToList(),
+            Parts = parts.ToList(),
             UploadedAt = DateTime.Now
         };
 

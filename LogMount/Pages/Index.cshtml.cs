@@ -251,16 +251,16 @@ public class IndexModel : PageModel
         try
         {
             await using var stream = PartListFile.OpenReadStream();
-            var partNames = await _partListParserService.ParseAsync(stream, PartListFile.FileName, cancellationToken);
+            var parts = await _partListParserService.ParseAsync(stream, PartListFile.FileName, cancellationToken);
 
             await HttpContext.Session.LoadAsync(cancellationToken);
 
             var partDataKey = Guid.NewGuid().ToString("N");
-            _partDataStore.Save(partDataKey, partNames, PartListFile.FileName);
+            _partDataStore.Save(partDataKey, parts, PartListFile.FileName);
             HttpContext.Session.SetString(SessionKeys.PartDataKey, partDataKey);
             await HttpContext.Session.CommitAsync(cancellationToken);
 
-            TempData["StatusMessage"] = $"Đã tải lên thành công {partNames.Count:N0} linh kiện đắt tiền từ file \"{PartListFile.FileName}\".";
+            TempData["StatusMessage"] = $"Đã tải lên thành công {parts.Count:N0} linh kiện đắt tiền từ file \"{PartListFile.FileName}\".";
             return RedirectToPage();
         }
         catch (Exception ex)
@@ -349,7 +349,7 @@ public class IndexModel : PageModel
         }
 
         UploadedPartFileName = partSession.FileName;
-        UploadedPartCount = partSession.PartNames.Count;
+        UploadedPartCount = partSession.Parts.Count;
     }
 
     public async Task<IActionResult> OnGetExportAsync(string section, string format, CancellationToken cancellationToken)

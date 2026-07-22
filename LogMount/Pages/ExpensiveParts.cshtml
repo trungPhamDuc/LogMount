@@ -63,6 +63,8 @@
                             <option value="location">Line → Mặt → Máy</option>
                             <option value="desc">Số lần: Lớn → Nhỏ</option>
                             <option value="asc">Số lần: Nhỏ → Lớn</option>
+                            <option value="cost-desc">Tổng giá tiền: Lớn → Nhỏ</option>
+                            <option value="cost-asc">Tổng giá tiền: Nhỏ → Lớn</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -108,7 +110,8 @@
                                             <th style="width: 48px;">#</th>
                                             <th>Parts Name</th>
                                             <th class="text-end">Số lần</th>
-                                            <th class="text-end">Nhóm lỗi</th>
+                                            <th class="text-end">Giá 1 con</th>
+                                            <th class="text-end">Tổng giá tiền</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -124,7 +127,8 @@
                                                     </button>
                                                 </td>
                                                 <td class="text-end fw-semibold text-danger">@item.TotalCount.ToString("N0")</td>
-                                                <td class="text-end text-muted">@item.ErrorGroupCount.ToString("N0")</td>
+                                                <td class="text-end text-muted">@item.Cost.ToString("N2")</td>
+                                                <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -143,7 +147,9 @@
                         <h2 class="h5 card-title mb-1">Chi tiết lỗi theo linh kiện đắt tiền</h2>
                         <p class="text-muted small mb-0">
                             @Model.FilteredSummary.Count.ToString("N0") dòng —
-                            @(Model.Filter.IsCountSort
+                            @(Model.Filter.IsCostSort
+                                ? $"sắp xếp theo tổng giá tiền {(Model.Filter.IsCostDescending ? "giảm dần" : "tăng dần")}."
+                                : Model.Filter.IsCountSort
                                 ? $"sắp xếp theo số lần {(Model.Filter.IsDescending ? "giảm dần" : "tăng dần")}."
                                 : "sắp xếp theo Line, Mặt (Bot → Top), rồi Máy (A → Z).")
                         </p>
@@ -176,6 +182,7 @@
                                     <th>Feeder</th>
                                     <th>Error No.</th>
                                     <th>Error Name</th>
+                                    <th class="text-end">Tổng giá tiền</th>
                                     <th class="text-end">Số lần</th>
                                 </tr>
                             </thead>
@@ -193,6 +200,7 @@
                                         <td class="error-name-cell">
                                             <span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span>
                                         </td>
+                                        <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td>
                                         <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
                                     </tr>
                                 }
@@ -200,6 +208,7 @@
                             <tfoot>
                                 <tr class="table-secondary fw-semibold">
                                     <td colspan="8">Tổng cộng (đã lọc)</td>
+                                    <td class="text-end text-danger">@Model.FilteredSummary.Sum(item => item.TotalCost).ToString("N2")</td>
                                     <td class="text-end">@Model.FilteredErrorCount.ToString("N0")</td>
                                 </tr>
                             </tfoot>
