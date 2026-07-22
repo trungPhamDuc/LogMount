@@ -1,6 +1,8 @@
+using LogMount.Data;
 using LogMount.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.EntityFrameworkCore;
 
 const long maxUploadBytes = 500L * 1024 * 1024;
 
@@ -22,6 +24,8 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 builder.Services.AddRazorPages();
+builder.Services.AddDbContext<LogMountDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
