@@ -36,10 +36,14 @@ public class LogMountDbContext : DbContext
             entity.Property(x => x.CartId).HasMaxLength(100);
             entity.Property(x => x.VisErrorNo).HasMaxLength(100);
             entity.Property(x => x.ErrorVacuum).HasMaxLength(100);
+            entity.Property(x => x.SourceFileName).HasMaxLength(255);
+            entity.Property(x => x.UploadBatchId).HasMaxLength(50);
 
+            entity.HasIndex(x => x.Date);
             entity.HasIndex(x => x.PartsName);
             entity.HasIndex(x => x.ErrorNo);
             entity.HasIndex(x => x.Line);
+            entity.HasIndex(x => x.UploadedAt);
         });
 
         modelBuilder.Entity<ExpensivePart>(entity =>
@@ -47,8 +51,10 @@ public class LogMountDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.PartsName).HasMaxLength(255);
             entity.Property(x => x.Cost).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.SourceFileName).HasMaxLength(255);
 
-            entity.HasIndex(x => x.PartsName).IsUnique();
+            entity.HasIndex(x => x.PartsName);
+            entity.HasIndex(x => x.UploadedAt);
         });
     }
 }

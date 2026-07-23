@@ -13,14 +13,17 @@ public static class ExpensivePartAnalysisService
             return [];
         }
 
-        var costsByPartName = expensiveParts.ToDictionary(
-            part => part.PartsName,
-            part => part.Cost,
+        var costsByPartName = expensiveParts
+            .Where(part => !string.IsNullOrWhiteSpace(part.PartsName))
+            .GroupBy(part => part.PartsName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+            group => group.Key,
+            group => group.Last().Cost ?? 0m,
             StringComparer.OrdinalIgnoreCase);
 
         return logEntries
             .Where(e => !string.IsNullOrWhiteSpace(e.PartsName) &&
-                        costsByPartName.ContainsKey(e.PartsName) &&
+                        costsByPartName.ContainsKey(e.PartsName!) &&
                         !IsVisionRetry(e.ErrorName))
             .Select(e =>
             {
@@ -36,7 +39,7 @@ public static class ExpensivePartAnalysisService
             .GroupBy(x => new
             {
                 x.Entry.PartsName,
-                Cost = costsByPartName[x.Entry.PartsName],
+                Cost = costsByPartName[x.Entry.PartsName!],
                 x.LineNumber,
                 x.Side,
                 x.Machine,
@@ -47,15 +50,15 @@ public static class ExpensivePartAnalysisService
             })
             .Select(g => new ExpensivePartSummaryItem
             {
-                PartsName = g.Key.PartsName,
+                PartsName = g.Key.PartsName ?? string.Empty,
                 Cost = g.Key.Cost,
                 Line = g.Key.LineNumber,
                 Side = g.Key.Side,
                 SideLabel = LotNameParser.GetSideLabel(g.Key.Side),
                 Machine = g.Key.Machine,
-                Lane = g.Key.Lane,
-                FeederNo = g.Key.FeederNo,
-                ErrorNo = g.Key.ErrorNo,
+                Lane = g.Key.Lane ?? string.Empty,
+                FeederNo = g.Key.FeederNo ?? string.Empty,
+                ErrorNo = g.Key.ErrorNo ?? string.Empty,
                 ErrorName = string.IsNullOrWhiteSpace(g.Key.ErrorName) ? "(Không có tên lỗi)" : g.Key.ErrorName,
                 Count = g.Count()
             })

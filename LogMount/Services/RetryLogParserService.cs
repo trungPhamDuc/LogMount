@@ -223,7 +223,7 @@ public class RetryLogParserService : IRetryLogParserService
                               VersionPattern.IsMatch(v));
     }
 
-    private static bool IsMetadataValue(string value)
+    private static bool IsMetadataValue(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -246,8 +246,8 @@ public class RetryLogParserService : IRetryLogParserService
             return false;
         }
 
-        if (entry.Language.Equals("EN", StringComparison.OrdinalIgnoreCase) &&
-            entry.OccurrenceTime.Equals("Occurrence Time", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(entry.Language, "EN", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(entry.OccurrenceTime, "Occurrence Time", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

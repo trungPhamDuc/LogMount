@@ -109,13 +109,13 @@ public class ExpensivePartsModel : PageModel
 
         if (string.IsNullOrEmpty(logDataKey))
         {
-            TempData["ErrorMessage"] = "Chưa có dữ liệu retry log. Vui lòng upload file log trước.";
+            TempData["ErrorMessage"] = "Chưa có dữ liệu retryLog. Vui lòng tải tệp log trước.";
             return RedirectToPage("/Index");
         }
 
         if (string.IsNullOrEmpty(partDataKey))
         {
-            TempData["ErrorMessage"] = "Chưa có file part lkdt. Vui lòng upload file linh kiện đắt tiền trước.";
+            TempData["ErrorMessage"] = "Chưa có tệp part lkdt. Vui lòng tải tệp linh kiện đắt tiền trước.";
             return RedirectToPage("/Index");
         }
 
@@ -126,7 +126,7 @@ public class ExpensivePartsModel : PageModel
         {
             HttpContext.Session.Remove(SessionKeys.LogDataKey);
             await HttpContext.Session.CommitAsync(cancellationToken);
-            TempData["ErrorMessage"] = "Dữ liệu log đã hết hạn. Vui lòng upload lại.";
+            TempData["ErrorMessage"] = "Dữ liệu log đã hết hạn. Vui lòng tải lên lại.";
             return RedirectToPage("/Index");
         }
 
@@ -134,7 +134,7 @@ public class ExpensivePartsModel : PageModel
         {
             HttpContext.Session.Remove(SessionKeys.PartDataKey);
             await HttpContext.Session.CommitAsync(cancellationToken);
-            TempData["ErrorMessage"] = "Dữ liệu part lkdt đã hết hạn. Vui lòng upload lại.";
+            TempData["ErrorMessage"] = "Dữ liệu part lkdt đã hết hạn. Vui lòng tải lên lại.";
             return RedirectToPage("/Index");
         }
 

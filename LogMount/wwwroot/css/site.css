@@ -18,7 +18,82 @@ html {
 }
 
 body {
-  margin-bottom: 60px;
+  margin: 0;
+  background: #f5f7fb;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  width: 280px;
+  height: 100vh;
+  padding: 1.25rem;
+  background: #111827;
+  color: #fff;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sidebar-brand:hover {
+  color: #fff;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 0.9rem 1rem;
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.85rem;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  color: #fff;
+  background: #2563eb;
+  border-color: #60a5fa;
+}
+
+.sidebar-link-title,
+.sidebar-link-subtitle {
+  display: block;
+}
+
+.sidebar-link-title {
+  font-weight: 700;
+}
+
+.sidebar-link-subtitle {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  opacity: 0.82;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  padding: 1.5rem;
 }
 
 .logmount-page .page-header h1 {
@@ -129,4 +204,25 @@ body {
 
 .part-detail-link:hover {
   text-decoration: underline;
+}
+
+.daily-log-list {
+  max-height: 520px;
+  overflow: auto;
+}
+
+@media (max-width: 991.98px) {
+  .app-shell {
+    display: block;
+  }
+
+  .app-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+
+  .app-content {
+    padding: 1rem;
+  }
 }

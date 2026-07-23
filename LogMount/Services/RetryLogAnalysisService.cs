@@ -41,7 +41,7 @@ public static class RetryLogAnalysisService
             .Select(g => new ErrorSummaryItem
             {
                 ErrorName = string.IsNullOrWhiteSpace(g.Key.ErrorName) ? "(Không có tên lỗi)" : g.Key.ErrorName,
-                ErrorNo = g.Key.ErrorNo,
+                ErrorNo = g.Key.ErrorNo ?? string.Empty,
                 Count = g.Count(),
                 Dates = DistinctValues(g, e => e.Date),
                 Lines = DistinctValues(g, e => e.Line),
@@ -92,7 +92,7 @@ public static class RetryLogAnalysisService
     private static IEnumerable<RetryLogEntry> ApplyContainsFilter(
         IEnumerable<RetryLogEntry> query,
         string? value,
-        Func<RetryLogEntry, string> selector)
+        Func<RetryLogEntry, string?> selector)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -100,17 +100,18 @@ public static class RetryLogAnalysisService
         }
 
         var trimmed = value.Trim();
-        return query.Where(e => selector(e).Contains(trimmed, StringComparison.OrdinalIgnoreCase));
+        return query.Where(e => selector(e)?.Contains(trimmed, StringComparison.OrdinalIgnoreCase) == true);
     }
 
     private static ColumnSummaryItem BuildColumnSummary(
         string columnName,
         IReadOnlyList<RetryLogEntry> entries,
-        Func<RetryLogEntry, string> selector)
+        Func<RetryLogEntry, string?> selector)
     {
         var values = entries
             .Select(selector)
             .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -123,11 +124,12 @@ public static class RetryLogAnalysisService
         };
     }
 
-    private static string DistinctValues(IEnumerable<RetryLogEntry> entries, Func<RetryLogEntry, string> selector)
+    private static string DistinctValues(IEnumerable<RetryLogEntry> entries, Func<RetryLogEntry, string?> selector)
     {
         var values = entries
             .Select(selector)
             .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
             .ToList();

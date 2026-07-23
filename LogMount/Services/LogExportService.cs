@@ -81,22 +81,22 @@ public class LogExportService : ILogExportService
     {
         var rows = items.Select(item => new string[]
         {
-            item.Date,
-            item.Line,
-            item.OccurrenceTime,
-            item.ErrorNo,
-            item.ErrorName,
-            item.Lane,
-            item.Table,
-            item.PartsNo,
-            item.PartsName,
-            item.HeadNo,
-            item.NozzleType,
-            item.FeederNo,
-            item.FeederId,
-            item.CartId,
-            item.VisErrorNo,
-            item.ErrorVacuum
+            item.Date ?? string.Empty,
+            item.Line ?? string.Empty,
+            item.OccurrenceTime ?? string.Empty,
+            item.ErrorNo ?? string.Empty,
+            item.ErrorName ?? string.Empty,
+            item.Lane ?? string.Empty,
+            item.Table ?? string.Empty,
+            item.PartsNo ?? string.Empty,
+            item.PartsName ?? string.Empty,
+            item.HeadNo ?? string.Empty,
+            item.NozzleType ?? string.Empty,
+            item.FeederNo ?? string.Empty,
+            item.FeederId ?? string.Empty,
+            item.CartId ?? string.Empty,
+            item.VisErrorNo ?? string.Empty,
+            item.ErrorVacuum ?? string.Empty
         });
 
         return Export("du-lieu-log", LogHeaders, rows, format, baseFileName);
@@ -133,14 +133,14 @@ public class LogExportService : ILogExportService
 
         var webRows = items.Select(item => new string[]
             {
-                item.PartsName,
-                item.Line,
+                item.PartsName ?? string.Empty,
+                item.Line ?? string.Empty,
                 $"{item.SideLabel} ({item.Side})",
                 item.Machine,
-                item.Lane,
-                item.FeederNo,
-                item.ErrorNo,
-                item.ErrorName,
+                item.Lane ?? string.Empty,
+                item.FeederNo ?? string.Empty,
+                item.ErrorNo ?? string.Empty,
+                item.ErrorName ?? string.Empty,
                 item.TotalCost.ToString("F2", CultureInfo.InvariantCulture),
                 item.Count.ToString(CultureInfo.InvariantCulture)
             })

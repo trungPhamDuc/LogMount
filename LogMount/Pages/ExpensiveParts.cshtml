@@ -10,29 +10,17 @@
             <div>
                 <h1 class="h2 mb-1">Tổng hợp linh kiện đắt tiền</h1>
                 <p class="text-muted mb-0">
-                    So sánh part name trong file part lkdt với dữ liệu retry log đã upload.
+                    So sánh Parts Name trong tệp part lkdt với dữ liệu retryLog đã tải lên.
                 </p>
             </div>
             <a asp-page="/Index" class="btn btn-outline-secondary">← Quay lại</a>
         </div>
     </div>
 
-    <div class="alert alert-info mb-4">
-        <div><strong>File log:</strong> @Model.LogFileName — @Model.LogRecordCount.ToString("N0") dòng</div>
-        <div><strong>File part lkdt:</strong> @Model.PartFileName — @Model.PartCount.ToString("N0") linh kiện</div>
-        <div>
-            <strong>Kết quả khớp:</strong> @Model.Summary.Count.ToString("N0") nhóm lỗi — tổng @Model.TotalErrorCount.ToString("N0") lần
-            @if (Model.IsFiltered)
-            {
-                <span>— Sau lọc: <strong>@Model.FilteredSummary.Count.ToString("N0")</strong> nhóm, <strong>@Model.FilteredErrorCount.ToString("N0")</strong> lần</span>
-            }
-        </div>
-    </div>
-
     @if (Model.Summary.Count == 0)
     {
         <div class="alert alert-warning">
-            Không tìm thấy lỗi nào liên quan đến linh kiện đắt tiền trong dữ liệu retry log.
+            Không tìm thấy lỗi nào liên quan đến linh kiện đắt tiền trong dữ liệu retryLog.
         </div>
     }
     else
@@ -91,7 +79,6 @@
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <h2 class="h5 card-title mb-1">Biểu đồ Top @Model.TopN linh kiện rơi nhiều nhất</h2>
-                            <p class="text-muted small mb-3">Tổng số lần lỗi theo part name (sau khi lọc).</p>
                             <div class="chart-wrapper">
                                 <canvas id="topPartsChart" aria-label="Biểu đồ top linh kiện"></canvas>
                             </div>
@@ -102,7 +89,6 @@
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <h2 class="h5 card-title mb-1">Thống kê Top @Model.TopN</h2>
-                            <p class="text-muted small mb-3">Xếp hạng linh kiện đắt tiền rơi nhiều nhất.</p>
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped align-middle mb-0">
                                     <thead class="table-light">
@@ -145,14 +131,6 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <div>
                         <h2 class="h5 card-title mb-1">Chi tiết lỗi theo linh kiện đắt tiền</h2>
-                        <p class="text-muted small mb-0">
-                            @Model.FilteredSummary.Count.ToString("N0") dòng —
-                            @(Model.Filter.IsCostSort
-                                ? $"sắp xếp theo tổng giá tiền {(Model.Filter.IsCostDescending ? "giảm dần" : "tăng dần")}."
-                                : Model.Filter.IsCountSort
-                                ? $"sắp xếp theo số lần {(Model.Filter.IsDescending ? "giảm dần" : "tăng dần")}."
-                                : "sắp xếp theo Line, Mặt (Bot → Top), rồi Máy (A → Z).")
-                        </p>
                     </div>
                     <div class="d-flex gap-2">
                         <a asp-page="./ExpensiveParts" asp-page-handler="Export" asp-route-format="Csv"

@@ -1,0 +1,399 @@
+@page
+@model DataByDateModel
+@{
+    ViewData["Title"] = "Xem dữ liệu theo ngày";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <h1 class="h2 mb-1">Xem dữ liệu theo ngày</h1>
+    </div>
+
+    @if (Model.DailySummaries.Count == 0)
+    {
+        <div class="alert alert-warning">
+            Chưa có dữ liệu retryLog trong CSDL. Vui lòng tải tệp ở trang Phân tích retryLog trước.
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 mb-4">
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h2 class="h5 card-title mb-3">5 ngày tải lên gần nhất</h2>
+                        <form method="get" class="mb-3">
+                            <label asp-for="SearchDate" class="form-label">Tìm kiếm ngày</label>
+                            <div class="input-group">
+                                <input asp-for="SearchDate" class="form-control" placeholder="VD: 2026/07/22" />
+                                <button type="submit" class="btn btn-outline-primary">Tìm</button>
+                            </div>
+                        </form>
+                        <div class="list-group daily-log-list">
+                            @if (Model.DisplayDailySummaries.Count == 0)
+                            {
+                                <div class="alert alert-warning mb-0">Không tìm thấy ngày phù hợp.</div>
+                            }
+                            @foreach (var item in Model.DisplayDailySummaries)
+                            {
+                                <a asp-page="./DataByDate"
+                                   asp-route-SelectedDate="@item.Date"
+                                   asp-route-SearchDate="@Model.SearchDate"
+                                   class="list-group-item list-group-item-action @(item.Date == Model.SelectedDate ? "active" : "")">
+                                    <span class="fw-semibold">@item.Date</span>
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h2 class="h5 card-title mb-3">Chọn ngày</h2>
+                        <form method="get" class="row g-3 align-items-end">
+                            <input type="hidden" asp-for="SearchDate" />
+                            <div class="col-md-8">
+                                <label asp-for="SelectedDate" class="form-label">Ngày trong dữ liệu</label>
+                                <select asp-for="SelectedDate" class="form-select">
+                                    @foreach (var date in Model.AvailableDates)
+                                    {
+                                        <option value="@date">@date</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary w-100">Xem dữ liệu</button>
+                            </div>
+                        </form>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.ExpensivePartCount == 0)
+        {
+            <div class="alert alert-warning mb-4">
+                Chưa có dữ liệu part lkdt trong CSDL. Vui lòng tải tệp linh kiện đắt tiền ở trang Phân tích retryLog trước.
+            </div>
+        }
+        else
+        {
+            <div class="card shadow-sm mb-4" id="daily-expensive-parts">
+                <div class="card-body">
+                    <h2 class="h5 card-title mb-3">Lọc &amp; sắp xếp linh kiện đắt tiền</h2>
+                    <form method="get" class="row g-3">
+                        <input type="hidden" asp-for="SelectedDate" />
+                        <input type="hidden" asp-for="SearchDate" />
+                        <input type="hidden" asp-for="PageNumber" />
+                        <input type="hidden" name="PartPageNumber" value="1" />
+                        <div class="col-md-3">
+                            <label asp-for="PartFilter.PartsName" class="form-label">Parts Name</label>
+                            <input asp-for="PartFilter.PartsName" class="form-control" placeholder="VD: EAG65195601" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="PartFilter.Line" class="form-label">Line</label>
+                            <input asp-for="PartFilter.Line" class="form-control" placeholder="VD: L1" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="PartFilter.Machine" class="form-label">Máy</label>
+                            <input asp-for="PartFilter.Machine" class="form-control" placeholder="VD: G" />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="PartFilter.ErrorName" class="form-label">Error Name</label>
+                            <input asp-for="PartFilter.ErrorName" class="form-control" placeholder="VD: PICK UP ERROR" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="PartFilter.SortDirection" class="form-label">Sắp xếp bảng</label>
+                            <select asp-for="PartFilter.SortDirection" class="form-select">
+                                <option value="location">Line → Mặt → Máy</option>
+                                <option value="desc">Số lần: Lớn → Nhỏ</option>
+                                <option value="asc">Số lần: Nhỏ → Lớn</option>
+                                <option value="cost-desc">Tổng giá tiền: Lớn → Nhỏ</option>
+                                <option value="cost-asc">Tổng giá tiền: Nhỏ → Lớn</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="TopN" class="form-label">Top linh kiện</label>
+                            <select asp-for="TopN" class="form-select">
+                                @foreach (var option in Model.TopNChoices)
+                                {
+                                    <option value="@option">Top @option</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Áp dụng</button>
+                            <a asp-page="./DataByDate" asp-all-route-data="@Model.GetPartRouteValues()" class="btn btn-outline-secondary">Xóa bộ lọc</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            @if (Model.TopParts.Count > 0)
+            {
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-7">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="h5 card-title mb-1">Biểu đồ Top @Model.TopN linh kiện rơi nhiều nhất</h2>
+                                <div class="chart-wrapper">
+                                    <canvas id="dailyTopPartsChart" aria-label="Biểu đồ top linh kiện theo ngày"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="h5 card-title mb-1">Thống kê Top @Model.TopN</h2>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 48px;">#</th>
+                                                <th>Parts Name</th>
+                                                <th class="text-end">Số lần</th>
+                                                <th class="text-end">Giá 1 con</th>
+                                                <th class="text-end">Tổng giá tiền</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var item in Model.TopParts)
+                                            {
+                                                <tr>
+                                                    <td class="fw-semibold">@item.Rank</td>
+                                                    <td>@item.PartsName</td>
+                                                    <td class="text-end fw-semibold text-danger">@item.TotalCount.ToString("N0")</td>
+                                                    <td class="text-end text-muted">@item.Cost.ToString("N2")</td>
+                                                    <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h2 class="h5 card-title mb-1">Chi tiết lỗi theo linh kiện đắt tiền</h2>
+                        </div>
+                    </div>
+
+                    @if (Model.FilteredExpensivePartSummary.Count == 0)
+                    {
+                        <div class="alert alert-warning mb-0">Không có dữ liệu phù hợp với bộ lọc.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive summary-table-wrapper">
+                            <table class="table table-sm table-striped table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Parts Name</th>
+                                        <th>Line</th>
+                                        <th>Mặt</th>
+                                        <th>Máy</th>
+                                        <th>Lane</th>
+                                        <th>Feeder</th>
+                                        <th>Error No.</th>
+                                        <th>Error Name</th>
+                                        <th class="text-end">Tổng giá tiền</th>
+                                        <th class="text-end">Số lần</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.PagedFilteredExpensivePartSummary)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@item.PartsName</td>
+                                            <td>@item.Line</td>
+                                            <td>@item.SideLabel (@item.Side)</td>
+                                            <td>@item.Machine</td>
+                                            <td>@item.Lane</td>
+                                            <td>@item.FeederNo</td>
+                                            <td>@item.ErrorNo</td>
+                                            <td class="error-name-cell">
+                                                <span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span>
+                                            </td>
+                                            <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td>
+                                            <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary fw-semibold">
+                                        <td colspan="8">Tổng cộng (đã lọc)</td>
+                                        <td class="text-end text-danger">@Model.FilteredExpensivePartSummary.Sum(item => item.TotalCost).ToString("N2")</td>
+                                        <td class="text-end">@Model.FilteredExpensivePartErrorCount.ToString("N0")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        @if (Model.TotalPartPages > 1)
+                        {
+                            <nav class="mt-3" aria-label="Phân trang chi tiết linh kiện đắt tiền">
+                                <ul class="pagination pagination-sm justify-content-center mb-0">
+                                    <li class="page-item @(Model.PartPageNumber <= 1 ? "disabled" : "")">
+                                        <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetPartPaginationRouteValues(Model.PartPageNumber - 1)">Trước</a>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Trang @Model.PartPageNumber / @Model.TotalPartPages</span>
+                                    </li>
+                                    <li class="page-item @(Model.PartPageNumber >= Model.TotalPartPages ? "disabled" : "")">
+                                        <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetPartPaginationRouteValues(Model.PartPageNumber + 1)">Sau</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                    <div>
+                        <h2 class="h5 card-title mb-1">Dữ liệu ngày @Model.SelectedDate</h2>
+                    </div>
+                </div>
+
+                <div class="table-responsive log-table-wrapper">
+                    <table class="table table-sm table-bordered table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Date</th>
+                                <th>Line</th>
+                                <th>Occurrence Time</th>
+                                <th>Error No.</th>
+                                <th>Error Name</th>
+                                <th>Lane</th>
+                                <th>Table</th>
+                                <th>Parts No.</th>
+                                <th>Parts Name</th>
+                                <th>Head No.</th>
+                                <th>Nozzle Type</th>
+                                <th>Feeder No.</th>
+                                <th>Feeder ID</th>
+                                <th>Cart ID</th>
+                                <th>Vis Error No.</th>
+                                <th>Error Vacuum</th>
+                                <th>Tệp đã tải</th>
+                                <th>Thời gian tải lên</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.Entries)
+                            {
+                                <tr>
+                                    <td>@row.Date</td>
+                                    <td>@row.Line</td>
+                                    <td>@row.OccurrenceTime</td>
+                                    <td>@row.ErrorNo</td>
+                                    <td class="error-name-cell">
+                                        @if (string.IsNullOrWhiteSpace(row.ErrorName))
+                                        {
+                                            <span class="error-name-tag error-name-empty">—</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="@IndexModel.GetErrorNameCssClass(row.ErrorName)">@row.ErrorName</span>
+                                        }
+                                    </td>
+                                    <td>@row.Lane</td>
+                                    <td>@row.Table</td>
+                                    <td>@row.PartsNo</td>
+                                    <td>@row.PartsName</td>
+                                    <td>@row.HeadNo</td>
+                                    <td>@row.NozzleType</td>
+                                    <td>@row.FeederNo</td>
+                                    <td>@row.FeederId</td>
+                                    <td>@row.CartId</td>
+                                    <td>@row.VisErrorNo</td>
+                                    <td>@row.ErrorVacuum</td>
+                                    <td>@row.SourceFileName</td>
+                                    <td>@(row.UploadedAt?.ToString("dd/MM/yyyy HH:mm:ss"))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav class="mt-3" aria-label="Phân trang dữ liệu theo ngày">
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : "")">
+                                <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetRouteValues(Model.PageNumber - 1)">Trước</a>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Trang @Model.PageNumber / @Model.TotalPages</span>
+                            </li>
+                            <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                                <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetRouteValues(Model.PageNumber + 1)">Sau</a>
+                            </li>
+                        </ul>
+                    </nav>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        (function () {
+            var chartCanvas = document.getElementById('dailyTopPartsChart');
+            if (!chartCanvas) {
+                return;
+            }
+
+            var chartData = @Html.Raw(Model.ChartDataJson);
+            if (!chartData.length) {
+                return;
+            }
+
+            var labels = chartData.map(function (item) { return item.partsName; });
+            var values = chartData.map(function (item) { return item.totalCount; });
+
+            new Chart(chartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Số lần lỗi',
+                        data: values,
+                        backgroundColor: 'rgba(220, 53, 69, 0.75)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+}

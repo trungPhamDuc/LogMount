@@ -5,7 +5,7 @@ public static class LotNameParser
     /// <summary>
     /// Parses Lot Name like "EBR26597304_B_A_L12_V10_LANE2_24CY" into "L1-B-A".
     /// </summary>
-    public static string ParseLine(string lotName)
+    public static string ParseLine(string? lotName)
     {
         if (string.IsNullOrWhiteSpace(lotName))
         {
@@ -35,7 +35,7 @@ public static class LotNameParser
         return $"L{lineNo}-{side}-{machine}";
     }
 
-    public static string ParseLineNumber(string lotName)
+    public static string ParseLineNumber(string? lotName)
     {
         if (TryParseLotNameParts(lotName, out _, out _, out var lineSegment))
         {
@@ -52,29 +52,29 @@ public static class LotNameParser
         return string.Empty;
     }
 
-    public static string ParseSide(string lotName)
+    public static string ParseSide(string? lotName)
     {
         return TryParseLotNameParts(lotName, out var side, out _, out _)
             ? side
             : string.Empty;
     }
 
-    public static string ParseMachine(string lotName)
+    public static string ParseMachine(string? lotName)
     {
         return TryParseLotNameParts(lotName, out _, out var machine, out _)
             ? machine
             : string.Empty;
     }
 
-    public static string GetSideLabel(string side) =>
-        side.ToUpperInvariant() switch
+    public static string GetSideLabel(string? side) =>
+        (side ?? string.Empty).ToUpperInvariant() switch
         {
             "B" => "Bot",
             "T" => "Top",
-            _ => side
+            _ => side ?? string.Empty
         };
 
-    public static (string LineNumber, string Side, string Machine) ParseLineComponents(string lineValue, string lotName)
+    public static (string LineNumber, string Side, string Machine) ParseLineComponents(string? lineValue, string? lotName)
     {
         if (!string.IsNullOrWhiteSpace(lineValue))
         {
@@ -89,7 +89,7 @@ public static class LotNameParser
     }
 
     private static bool TryParseLotNameParts(
-        string lotName,
+        string? lotName,
         out string side,
         out string machine,
         out string lineSegment)
@@ -115,7 +115,7 @@ public static class LotNameParser
         return true;
     }
 
-    public static string ExtractDate(string occurrenceTime)
+    public static string ExtractDate(string? occurrenceTime)
     {
         if (string.IsNullOrWhiteSpace(occurrenceTime))
         {
