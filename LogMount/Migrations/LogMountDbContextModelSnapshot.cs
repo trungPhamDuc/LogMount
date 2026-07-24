@@ -148,6 +148,9 @@ namespace LogMount.Migrations
 
                     b.HasIndex("Date");
 
+                    b.HasIndex("Date", "UploadedAt", "Id")
+                        .IsDescending(false, true, false);
+
                     b.HasIndex("ErrorNo");
 
                     b.HasIndex("Line");

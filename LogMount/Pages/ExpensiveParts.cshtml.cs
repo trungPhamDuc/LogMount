@@ -36,6 +36,7 @@ public class ExpensivePartsModel : PageModel
 
     public IReadOnlyList<ExpensivePartSummaryItem> Summary { get; set; } = [];
     public IReadOnlyList<ExpensivePartSummaryItem> FilteredSummary { get; set; } = [];
+    public IReadOnlyList<ExpensivePartSummaryItem> CountSummary { get; set; } = [];
     public IReadOnlyList<ExpensivePartTopItem> TopParts { get; set; } = [];
     public IReadOnlyList<int> TopNChoices { get; } = TopNOptions;
     public string? LogFileName { get; set; }
@@ -60,7 +61,7 @@ public class ExpensivePartsModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnGetExportAsync(string format, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetExportAsync(string format, bool summaryOnly, CancellationToken cancellationToken)
     {
         var loadResult = await LoadSummaryAsync(cancellationToken);
         if (loadResult is not null)
@@ -68,7 +69,8 @@ public class ExpensivePartsModel : PageModel
             return loadResult;
         }
 
-        if (FilteredSummary.Count == 0)
+        var exportItems = summaryOnly ? CountSummary : FilteredSummary;
+        if (exportItems.Count == 0)
         {
             return BadRequest("Không có dữ liệu để tải xuống.");
         }
@@ -79,14 +81,14 @@ public class ExpensivePartsModel : PageModel
         }
 
         var exportResult = _exportService.ExportExpensiveParts(
-            FilteredSummary,
+            exportItems,
             exportFormat,
             PartFileName ?? "part-lkdt");
 
         return File(exportResult.Content, exportResult.ContentType, exportResult.FileName);
     }
 
-    public Dictionary<string, string?> GetExportRouteValues(string format)
+    public Dictionary<string, string?> GetExportRouteValues(string format, bool summaryOnly = false)
     {
         return new Dictionary<string, string?>
         {
@@ -94,9 +96,11 @@ public class ExpensivePartsModel : PageModel
             ["Filter.PartsName"] = Filter.PartsName,
             ["Filter.Line"] = Filter.Line,
             ["Filter.Machine"] = Filter.Machine,
+            ["Filter.Shift"] = Filter.Shift,
             ["Filter.ErrorName"] = Filter.ErrorName,
             ["Filter.SortDirection"] = Filter.SortDirection,
-            ["TopN"] = TopN.ToString()
+            ["TopN"] = TopN.ToString(),
+            ["summaryOnly"] = summaryOnly.ToString()
         };
     }
 
@@ -150,6 +154,9 @@ public class ExpensivePartsModel : PageModel
         var filtered = ExpensivePartAnalysisService.Filter(Summary, Filter);
         FilteredSummary = ExpensivePartAnalysisService.SortByCount(filtered, Filter);
         FilteredErrorCount = FilteredSummary.Sum(x => x.Count);
+        CountSummary = ExpensivePartAnalysisService.SortByCount(
+            ExpensivePartAnalysisService.SummarizeCounts(FilteredSummary),
+            Filter);
         TopParts = ExpensivePartAnalysisService.GetTopParts(filtered, TopN, Filter.IsCostSort);
 
         ChartDataJson = JsonSerializer.Serialize(TopParts.Select(x => new

@@ -45,20 +45,22 @@ public static class ExpensivePartAnalysisService
                 x.Machine,
                 x.Entry.Lane,
                 x.Entry.FeederNo,
-                x.Entry.ErrorNo,
+                x.Entry.OccurrenceTime,
+                Shift = GetShift(x.Entry.OccurrenceTime),
                 x.Entry.ErrorName
             })
             .Select(g => new ExpensivePartSummaryItem
             {
                 PartsName = g.Key.PartsName ?? string.Empty,
                 Cost = g.Key.Cost,
-                Line = g.Key.LineNumber,
+                Line = GetDisplayLine(g.Key.LineNumber),
                 Side = g.Key.Side,
                 SideLabel = LotNameParser.GetSideLabel(g.Key.Side),
                 Machine = g.Key.Machine,
                 Lane = g.Key.Lane ?? string.Empty,
                 FeederNo = g.Key.FeederNo ?? string.Empty,
-                ErrorNo = g.Key.ErrorNo ?? string.Empty,
+                OccurrenceTime = g.Key.OccurrenceTime ?? string.Empty,
+                Shift = g.Key.Shift,
                 ErrorName = string.IsNullOrWhiteSpace(g.Key.ErrorName) ? "(Không có tên lỗi)" : g.Key.ErrorName,
                 Count = g.Count()
             })
@@ -80,9 +82,44 @@ public static class ExpensivePartAnalysisService
         query = ApplyContainsFilter(query, criteria.PartsName, x => x.PartsName);
         query = ApplyContainsFilter(query, criteria.Line, x => x.Line);
         query = ApplyContainsFilter(query, criteria.Machine, x => x.Machine);
+        query = ApplyContainsFilter(query, criteria.Shift, x => x.Shift);
         query = ApplyContainsFilter(query, criteria.ErrorName, x => x.ErrorName);
 
         return query.ToList();
+    }
+
+    public static IReadOnlyList<ExpensivePartSummaryItem> SummarizeCounts(
+        IReadOnlyList<ExpensivePartSummaryItem> items)
+    {
+        return items
+            .GroupBy(item => new
+            {
+                item.PartsName,
+                item.Cost,
+                item.Line,
+                item.Side,
+                item.SideLabel,
+                item.Machine,
+                item.Lane,
+                item.FeederNo,
+                item.Shift,
+                item.ErrorName
+            })
+            .Select(group => new ExpensivePartSummaryItem
+            {
+                PartsName = group.Key.PartsName,
+                Cost = group.Key.Cost,
+                Line = group.Key.Line,
+                Side = group.Key.Side,
+                SideLabel = group.Key.SideLabel,
+                Machine = group.Key.Machine,
+                Lane = group.Key.Lane,
+                FeederNo = group.Key.FeederNo,
+                Shift = group.Key.Shift,
+                ErrorName = group.Key.ErrorName,
+                Count = group.Sum(item => item.Count)
+            })
+            .ToList();
     }
 
     public static IReadOnlyList<ExpensivePartSummaryItem> SortByCount(
@@ -107,14 +144,18 @@ public static class ExpensivePartAnalysisService
             return criteria.IsDescending
                 ? items.OrderByDescending(x => x.Count)
                     .ThenBy(x => GetLineSortOrder(x.Line))
+                    .ThenBy(x => x.Lane, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(x => GetSideSortOrder(x.Side))
                     .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => GetShiftSortOrder(x.Shift))
                     .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
                     .ToList()
                 : items.OrderBy(x => x.Count)
                     .ThenBy(x => GetLineSortOrder(x.Line))
+                    .ThenBy(x => x.Lane, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(x => GetSideSortOrder(x.Side))
                     .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => GetShiftSortOrder(x.Shift))
                     .ThenBy(x => x.PartsName, StringComparer.OrdinalIgnoreCase)
                     .ToList();
         }
@@ -122,8 +163,10 @@ public static class ExpensivePartAnalysisService
         var orderedItems = items
             .OrderBy(x => GetLineSortOrder(x.Line))
             .ThenBy(x => x.Line, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Lane, StringComparer.OrdinalIgnoreCase)
             .ThenBy(x => GetSideSortOrder(x.Side))
-            .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase);
+            .ThenBy(x => x.Machine, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => GetShiftSortOrder(x.Shift));
 
         return orderedItems
             .ThenByDescending(x => x.Count)
@@ -190,16 +233,41 @@ public static class ExpensivePartAnalysisService
     private static bool IsVisionRetry(string? errorName) =>
         string.Equals(errorName?.Trim(), "Vision Retry", StringComparison.OrdinalIgnoreCase);
 
+    // Ca ngày: 08:00–19:59; ca đêm: 20:00–07:59.
+    private static string GetShift(string? occurrenceTime)
+    {
+        if (!DateTime.TryParse(occurrenceTime, out var timestamp))
+        {
+            return "—";
+        }
+
+        return timestamp.Hour is >= 8 and < 20 ? "Ngày" : "Đêm";
+    }
+
     private static int GetLineSortOrder(string? line)
     {
         var value = line?.Trim() ?? string.Empty;
+        if (value.Equals("LLTE", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
         return value.StartsWith("L", StringComparison.OrdinalIgnoreCase) &&
                int.TryParse(value[1..], out var lineNumber)
             ? lineNumber
             : int.MaxValue;
     }
 
+    private static string GetDisplayLine(string? line) =>
+        string.Equals(line?.Trim(), "L0", StringComparison.OrdinalIgnoreCase)
+            ? "LLTE"
+            : line ?? string.Empty;
+
     private static int GetSideSortOrder(string? side) =>
         side?.Trim().Equals("B", StringComparison.OrdinalIgnoreCase) == true ? 0 :
         side?.Trim().Equals("T", StringComparison.OrdinalIgnoreCase) == true ? 1 : 2;
+
+    private static int GetShiftSortOrder(string? shift) =>
+        shift?.Trim().Equals("Ngày", StringComparison.OrdinalIgnoreCase) == true ? 0 :
+        shift?.Trim().Equals("Đêm", StringComparison.OrdinalIgnoreCase) == true ? 1 : 2;
 }

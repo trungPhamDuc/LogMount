@@ -5,6 +5,7 @@ public class ExpensivePartFilterCriteria
     public string? PartsName { get; set; }
     public string? Line { get; set; }
     public string? Machine { get; set; }
+    public string? Shift { get; set; }
     public string? ErrorName { get; set; }
     public string SortDirection { get; set; } = "location";
 
@@ -12,6 +13,7 @@ public class ExpensivePartFilterCriteria
         !string.IsNullOrWhiteSpace(PartsName) ||
         !string.IsNullOrWhiteSpace(Line) ||
         !string.IsNullOrWhiteSpace(Machine) ||
+        !string.IsNullOrWhiteSpace(Shift) ||
         !string.IsNullOrWhiteSpace(ErrorName);
 
     public bool IsCountSort =>

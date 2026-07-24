@@ -40,6 +40,8 @@ public class LogMountDbContext : DbContext
             entity.Property(x => x.UploadBatchId).HasMaxLength(50);
 
             entity.HasIndex(x => x.Date);
+            entity.HasIndex(x => new { x.Date, x.UploadedAt, x.Id })
+                .IsDescending(false, true, false);
             entity.HasIndex(x => x.PartsName);
             entity.HasIndex(x => x.ErrorNo);
             entity.HasIndex(x => x.Line);

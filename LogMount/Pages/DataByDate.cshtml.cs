@@ -42,6 +42,9 @@ public class DataByDateModel : PageModel
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
     public int TopN { get; set; } = 10;
 
+    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    public bool ShowExpensiveParts { get; set; }
+
     public IReadOnlyList<string> AvailableDates { get; set; } = [];
     public IReadOnlyList<RetryLogEntry> Entries { get; set; } = [];
     public int TotalRecords { get; set; }
@@ -52,6 +55,7 @@ public class DataByDateModel : PageModel
     public int ExpensivePartCount { get; set; }
     public IReadOnlyList<ExpensivePartSummaryItem> ExpensivePartSummary { get; set; } = [];
     public IReadOnlyList<ExpensivePartSummaryItem> FilteredExpensivePartSummary { get; set; } = [];
+    public IReadOnlyList<ExpensivePartSummaryItem> CountExpensivePartSummary { get; set; } = [];
     public IReadOnlyList<ExpensivePartSummaryItem> PagedFilteredExpensivePartSummary { get; set; } = [];
     public IReadOnlyList<ExpensivePartTopItem> TopParts { get; set; } = [];
     public int ExpensivePartTotalErrorCount { get; set; }
@@ -64,14 +68,13 @@ public class DataByDateModel : PageModel
         DailySummaries = await _dbContext.RetryLogEntries
             .AsNoTracking()
             .Where(x => !string.IsNullOrWhiteSpace(x.Date))
-            .GroupBy(x => x.Date!)
-            .Select(g => new DailyRetryLogSummary
+            .Select(x => x.Date!)
+            .Distinct()
+            .OrderByDescending(date => date)
+            .Select(date => new DailyRetryLogSummary
             {
-                Date = g.Key,
-                LastUploadedAt = g.Max(x => x.UploadedAt)
+                Date = date
             })
-            .OrderByDescending(x => x.LastUploadedAt)
-            .ThenByDescending(x => x.Date)
             .ToListAsync(cancellationToken);
 
         SearchDate = SearchDate?.Trim();
@@ -115,7 +118,10 @@ public class DataByDateModel : PageModel
             .Take(PageSize)
             .ToListAsync(cancellationToken);
 
-        await LoadExpensivePartSummaryAsync(query, cancellationToken);
+        if (ShowExpensiveParts)
+        {
+            await LoadExpensivePartSummaryAsync(query, cancellationToken);
+        }
     }
 
     public Dictionary<string, string?> GetRouteValues(int pageNumber)
@@ -129,9 +135,11 @@ public class DataByDateModel : PageModel
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
             ["PartFilter.Machine"] = PartFilter.Machine,
+            ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
-            ["TopN"] = TopN.ToString()
+            ["TopN"] = TopN.ToString(),
+            ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
     }
 
@@ -143,7 +151,8 @@ public class DataByDateModel : PageModel
             ["SearchDate"] = SearchDate,
             ["PageNumber"] = PageNumber.ToString(),
             ["PartPageNumber"] = "1",
-            ["TopN"] = TopN.ToString()
+            ["TopN"] = TopN.ToString(),
+            ["ShowExpensiveParts"] = "true"
         };
     }
 
@@ -158,9 +167,11 @@ public class DataByDateModel : PageModel
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
             ["PartFilter.Machine"] = PartFilter.Machine,
+            ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
-            ["TopN"] = TopN.ToString()
+            ["TopN"] = TopN.ToString(),
+            ["ShowExpensiveParts"] = "true"
         };
     }
 
@@ -202,6 +213,9 @@ public class DataByDateModel : PageModel
         var filtered = ExpensivePartAnalysisService.Filter(ExpensivePartSummary, PartFilter);
         FilteredExpensivePartSummary = ExpensivePartAnalysisService.SortByCount(filtered, PartFilter);
         FilteredExpensivePartErrorCount = FilteredExpensivePartSummary.Sum(x => x.Count);
+        CountExpensivePartSummary = ExpensivePartAnalysisService.SortByCount(
+            ExpensivePartAnalysisService.SummarizeCounts(FilteredExpensivePartSummary),
+            PartFilter);
         TotalPartPages = Math.Max(1, (int)Math.Ceiling(FilteredExpensivePartSummary.Count / (double)PartPageSize));
         PartPageNumber = Math.Clamp(PartPageNumber, 1, TotalPartPages);
         PagedFilteredExpensivePartSummary = FilteredExpensivePartSummary

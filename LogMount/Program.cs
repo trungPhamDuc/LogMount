@@ -25,7 +25,9 @@ builder.Services.Configure<FormOptions>(options =>
 
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<LogMountDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlServerOptions => sqlServerOptions.CommandTimeout(120)));
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>

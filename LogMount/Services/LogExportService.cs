@@ -21,21 +21,20 @@ public class LogExportService : ILogExportService
     [
         "Date", "Line", "Occurrence Time", "Error No.", "Error Name",
         "Lane", "Table", "Parts No.", "Parts Name", "Head No.", "Nozzle Type",
-        "Feeder No.", "Feeder ID", "Cart ID", "Vis Error No.", "Error Vacuum"
+        "Feeder No."
     ];
 
     private static readonly string[] ErrorHeaders =
     [
         "Error No.", "Error Name", "Số lần", "Date", "Line", "Occurrence Time", "Lot Name", "Lane", "Table",
-        "Parts No.", "Parts Name", "Head No.", "Nozzle Type", "Feeder No.", "Feeder ID",
-        "Cart ID", "Vis Error No.", "Error Vacuum"
+        "Parts No.", "Parts Name", "Head No.", "Nozzle Type", "Feeder No."
     ];
 
     private static readonly string[] OverviewHeaders = ["Cột", "Giá trị", "Số giá trị"];
 
     private static readonly string[] ExpensivePartHeaders =
     [
-        "Parts Name", "Giá 1 con", "Tổng giá tiền", "Line", "Mặt", "Máy", "Lane", "Feeder No.", "Error No.", "Error Name", "Số lần"
+        "Parts Name", "Giá 1 con", "Tổng giá tiền", "Line", "Mặt", "Máy", "Lane", "Feeder No.", "Occurrence Time", "Shift", "Error Name", "Số lần"
     ];
 
     public FileExportResult ExportOverview(IReadOnlyList<ColumnSummaryItem> items, ExportFormat format, string baseFileName)
@@ -67,11 +66,7 @@ public class LogExportService : ILogExportService
             item.PartsNames,
             item.HeadNumbers,
             item.NozzleTypes,
-            item.FeederNumbers,
-            item.FeederIds,
-            item.CartIds,
-            item.VisErrorNumbers,
-            item.ErrorVacuums
+            item.FeederNumbers
         });
 
         return Export("tong-hop-loi", ErrorHeaders, rows, format, baseFileName);
@@ -92,11 +87,7 @@ public class LogExportService : ILogExportService
             item.PartsName ?? string.Empty,
             item.HeadNo ?? string.Empty,
             item.NozzleType ?? string.Empty,
-            item.FeederNo ?? string.Empty,
-            item.FeederId ?? string.Empty,
-            item.CartId ?? string.Empty,
-            item.VisErrorNo ?? string.Empty,
-            item.ErrorVacuum ?? string.Empty
+            item.FeederNo ?? string.Empty
         });
 
         return Export("du-lieu-log", LogHeaders, rows, format, baseFileName);
@@ -114,7 +105,8 @@ public class LogExportService : ILogExportService
                 item.Machine,
                 item.Lane,
                 item.FeederNo,
-                item.ErrorNo,
+                item.OccurrenceTime,
+                item.Shift,
                 item.ErrorName,
                 item.Count.ToString(CultureInfo.InvariantCulture)
             })
@@ -122,13 +114,13 @@ public class LogExportService : ILogExportService
                 "Tổng cộng (đã lọc)", string.Empty,
                 items.Sum(item => item.TotalCost).ToString("F2", CultureInfo.InvariantCulture),
                 string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
-                string.Empty, string.Empty,
+                string.Empty, string.Empty, string.Empty,
                 items.Sum(item => item.Count).ToString(CultureInfo.InvariantCulture)
             ]);
 
         var webHeaders = new[]
         {
-            "Parts Name", "Line", "Mặt", "Máy", "Lane", "Feeder", "Error No.", "Error Name", "Tổng giá tiền", "Số lần"
+            "Parts Name", "Line", "Mặt", "Máy", "Lane", "Feeder", "Occurrence Time", "Shift", "Error Name", "Tổng giá tiền", "Số lần"
         };
 
         var webRows = items.Select(item => new string[]
@@ -139,7 +131,8 @@ public class LogExportService : ILogExportService
                 item.Machine,
                 item.Lane ?? string.Empty,
                 item.FeederNo ?? string.Empty,
-                item.ErrorNo ?? string.Empty,
+                item.OccurrenceTime ?? string.Empty,
+                item.Shift ?? string.Empty,
                 item.ErrorName ?? string.Empty,
                 item.TotalCost.ToString("F2", CultureInfo.InvariantCulture),
                 item.Count.ToString(CultureInfo.InvariantCulture)
@@ -147,7 +140,7 @@ public class LogExportService : ILogExportService
             .Append([
                 "Tổng cộng (đã lọc)",
                 string.Empty, string.Empty, string.Empty, string.Empty,
-                string.Empty, string.Empty, string.Empty,
+                string.Empty, string.Empty, string.Empty, string.Empty,
                 items.Sum(item => item.TotalCost).ToString("F2", CultureInfo.InvariantCulture),
                 items.Sum(item => item.Count).ToString(CultureInfo.InvariantCulture)
             ]);

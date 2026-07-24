@@ -41,6 +41,14 @@
                         <label asp-for="Filter.Machine" class="form-label">Máy</label>
                         <input asp-for="Filter.Machine" class="form-control" placeholder="VD: G" />
                     </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.Shift" class="form-label">Shift</label>
+                        <select asp-for="Filter.Shift" class="form-select">
+                            <option value="">Tất cả</option>
+                            <option value="Ngày">Ngày</option>
+                            <option value="Đêm">Đêm</option>
+                        </select>
+                    </div>
                     <div class="col-md-3">
                         <label asp-for="Filter.ErrorName" class="form-label">Error Name</label>
                         <input asp-for="Filter.ErrorName" class="form-control" placeholder="VD: PICK UP ERROR" />
@@ -48,7 +56,7 @@
                     <div class="col-md-2">
                         <label asp-for="Filter.SortDirection" class="form-label">Sắp xếp bảng</label>
                         <select asp-for="Filter.SortDirection" class="form-select">
-                            <option value="location">Line → Mặt → Máy</option>
+                            <option value="location">Line → Lane → Mặt → Máy → Shift</option>
                             <option value="desc">Số lần: Lớn → Nhỏ</option>
                             <option value="asc">Số lần: Nhỏ → Lớn</option>
                             <option value="cost-desc">Tổng giá tiền: Lớn → Nhỏ</option>
@@ -126,6 +134,49 @@
             </div>
         }
 
+        <div class="card shadow-sm mb-5">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                    <h2 class="h5 card-title mb-0">Tổng hợp linh kiện đắt tiền</h2>
+                    <div class="d-flex gap-2">
+                        <a asp-page="./ExpensiveParts" asp-page-handler="Export" asp-route-format="Csv"
+                           asp-all-route-data="@Model.GetExportRouteValues("Csv", true)"
+                           class="btn btn-sm btn-outline-success">Tải CSV</a>
+                        <a asp-page="./ExpensiveParts" asp-page-handler="Export" asp-route-format="Xlsx"
+                           asp-all-route-data="@Model.GetExportRouteValues("Xlsx", true)"
+                           class="btn btn-sm btn-outline-success">Tải Excel</a>
+                    </div>
+                </div>
+                <div class="table-responsive summary-table-wrapper">
+                    <table class="table table-sm table-striped table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Parts Name</th><th>Line</th><th>Lane</th><th>Mặt</th><th>Máy</th><th>Feeder</th><th>Shift</th><th>Error Name</th>
+                                <th class="text-end">Tổng giá tiền</th><th class="text-end">Số lần</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.CountSummary)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.PartsName</td><td>@item.Line</td><td>@item.Lane</td><td>@item.SideLabel (@item.Side)</td><td>@item.Machine</td><td>@item.FeederNo</td><td>@item.Shift</td>
+                                    <td class="error-name-cell"><span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span></td>
+                                    <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-secondary fw-semibold">
+                                <td colspan="8">Tổng cộng (đã lọc)</td>
+                                <td class="text-end text-danger">@Model.CountSummary.Sum(item => item.TotalCost).ToString("N2")</td>
+                                <td class="text-end">@Model.CountSummary.Sum(item => item.Count).ToString("N0")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="card shadow-sm" id="part-details">
             <div class="card-body">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
@@ -154,11 +205,12 @@
                                 <tr>
                                     <th>Parts Name</th>
                                     <th>Line</th>
+                                    <th>Lane</th>
                                     <th>Mặt</th>
                                     <th>Máy</th>
-                                    <th>Lane</th>
                                     <th>Feeder</th>
-                                    <th>Error No.</th>
+                                    <th>Occurrence Time</th>
+                                    <th>Shift</th>
                                     <th>Error Name</th>
                                     <th class="text-end">Tổng giá tiền</th>
                                     <th class="text-end">Số lần</th>
@@ -170,11 +222,12 @@
                                     <tr>
                                         <td class="fw-semibold">@item.PartsName</td>
                                         <td>@item.Line</td>
+                                        <td>@item.Lane</td>
                                         <td>@item.SideLabel (@item.Side)</td>
                                         <td>@item.Machine</td>
-                                        <td>@item.Lane</td>
                                         <td>@item.FeederNo</td>
-                                        <td>@item.ErrorNo</td>
+                                        <td>@item.OccurrenceTime</td>
+                                        <td>@item.Shift</td>
                                         <td class="error-name-cell">
                                             <span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span>
                                         </td>
@@ -185,7 +238,7 @@
                             </tbody>
                             <tfoot>
                                 <tr class="table-secondary fw-semibold">
-                                    <td colspan="8">Tổng cộng (đã lọc)</td>
+                                    <td colspan="9">Tổng cộng (đã lọc)</td>
                                     <td class="text-end text-danger">@Model.FilteredSummary.Sum(item => item.TotalCost).ToString("N2")</td>
                                     <td class="text-end">@Model.FilteredErrorCount.ToString("N0")</td>
                                 </tr>
@@ -195,6 +248,7 @@
                 }
             </div>
         </div>
+
     }
 </div>
 

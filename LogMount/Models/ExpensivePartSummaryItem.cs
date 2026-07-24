@@ -11,7 +11,8 @@ public class ExpensivePartSummaryItem
     public string Machine { get; set; } = string.Empty;
     public string Lane { get; set; } = string.Empty;
     public string FeederNo { get; set; } = string.Empty;
-    public string ErrorNo { get; set; } = string.Empty;
+    public string OccurrenceTime { get; set; } = string.Empty;
+    public string Shift { get; set; } = string.Empty;
     public string ErrorName { get; set; } = string.Empty;
     public int Count { get; set; }
 }
