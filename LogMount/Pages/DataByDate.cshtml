@@ -209,7 +209,19 @@
 
             <div class="card shadow-sm mb-5">
                 <div class="card-body">
-                    <h2 class="h5 card-title mb-3">Tổng hợp linh kiện đắt tiền</h2>
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                        <h2 class="h5 card-title mb-0">Tổng hợp linh kiện đắt tiền</h2>
+                        <div class="d-flex gap-2">
+                            <a asp-page="./DataByDate"
+                               asp-page-handler="Export"
+                               asp-all-route-data="@Model.GetExportRouteValues("ExpensiveParts", "Csv", true)"
+                               class="btn btn-outline-success btn-sm">Tải CSV</a>
+                            <a asp-page="./DataByDate"
+                               asp-page-handler="Export"
+                               asp-all-route-data="@Model.GetExportRouteValues("ExpensiveParts", "Xlsx", true)"
+                               class="btn btn-outline-success btn-sm">Tải Excel</a>
+                        </div>
+                    </div>
                     <div class="table-responsive summary-table-wrapper">
                         <table class="table table-sm table-striped table-hover align-middle mb-0">
                             <thead class="table-dark">
@@ -245,6 +257,16 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Chi tiết lỗi theo linh kiện đắt tiền</h2>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a asp-page="./DataByDate"
+                               asp-page-handler="Export"
+                               asp-all-route-data="@Model.GetExportRouteValues("ExpensiveParts", "Csv")"
+                               class="btn btn-outline-success btn-sm">Tải CSV</a>
+                            <a asp-page="./DataByDate"
+                               asp-page-handler="Export"
+                               asp-all-route-data="@Model.GetExportRouteValues("ExpensiveParts", "Xlsx")"
+                               class="btn btn-outline-success btn-sm">Tải Excel</a>
                         </div>
                     </div>
 
@@ -327,6 +349,16 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <div>
                         <h2 class="h5 card-title mb-1">Dữ liệu ngày @Model.SelectedDate</h2>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a asp-page="./DataByDate"
+                           asp-page-handler="Export"
+                           asp-all-route-data="@Model.GetExportRouteValues("Logs", "Csv")"
+                           class="btn btn-outline-success btn-sm">Tải CSV</a>
+                        <a asp-page="./DataByDate"
+                           asp-page-handler="Export"
+                           asp-all-route-data="@Model.GetExportRouteValues("Logs", "Xlsx")"
+                           class="btn btn-outline-success btn-sm">Tải Excel</a>
                     </div>
                 </div>
 

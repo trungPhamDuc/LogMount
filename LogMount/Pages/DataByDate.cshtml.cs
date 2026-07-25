@@ -2,6 +2,7 @@ using System.Text.Json;
 using LogMount.Data;
 using LogMount.Models;
 using LogMount.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,10 +19,12 @@ public class DataByDateModel : PageModel
     };
 
     private readonly LogMountDbContext _dbContext;
+    private readonly ILogExportService _exportService;
 
-    public DataByDateModel(LogMountDbContext dbContext)
+    public DataByDateModel(LogMountDbContext dbContext, ILogExportService exportService)
     {
         _dbContext = dbContext;
+        _exportService = exportService;
     }
 
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
@@ -124,6 +127,74 @@ public class DataByDateModel : PageModel
         }
     }
 
+    public async Task<IActionResult> OnGetExportAsync(
+        string section,
+        string format,
+        bool summaryOnly,
+        CancellationToken cancellationToken)
+    {
+        SelectedDate = SelectedDate?.Trim();
+        if (string.IsNullOrWhiteSpace(SelectedDate))
+        {
+            return BadRequest("Vui lòng chọn ngày cần tải xuống.");
+        }
+
+        if (!Enum.TryParse<ExportFormat>(format, ignoreCase: true, out var exportFormat))
+        {
+            return BadRequest("Định dạng tải xuống không hợp lệ.");
+        }
+
+        var baseFileName = $"du-lieu-ngay-{SelectedDate.Replace('/', '-')}";
+        FileExportResult exportResult;
+
+        switch (section?.Trim().ToLowerInvariant())
+        {
+            case "logs":
+                var logRows = await _dbContext.RetryLogEntries
+                    .AsNoTracking()
+                    .Where(x => x.Date == SelectedDate)
+                    .OrderByDescending(x => x.UploadedAt)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(cancellationToken);
+
+                if (logRows.Count == 0)
+                {
+                    return BadRequest("Không có dữ liệu log để tải xuống.");
+                }
+
+                exportResult = _exportService.ExportLogs(logRows, exportFormat, baseFileName);
+                break;
+
+            case "expensiveparts":
+                TopN = TopNOptions.Contains(TopN) ? TopN : 10;
+                var expensiveRows = await BuildExpensivePartSummaryForDateAsync(SelectedDate, cancellationToken);
+                var filteredRows = ExpensivePartAnalysisService.SortByCount(
+                    ExpensivePartAnalysisService.Filter(expensiveRows, PartFilter),
+                    PartFilter);
+                var exportRows = summaryOnly
+                    ? ExpensivePartAnalysisService.SortByCount(
+                        ExpensivePartAnalysisService.SummarizeCounts(filteredRows),
+                        PartFilter)
+                    : filteredRows;
+
+                if (exportRows.Count == 0)
+                {
+                    return BadRequest("Không có dữ liệu linh kiện đắt tiền để tải xuống.");
+                }
+
+                exportResult = _exportService.ExportExpensiveParts(
+                    exportRows,
+                    exportFormat,
+                    $"{baseFileName}-linh-kien-dat-tien");
+                break;
+
+            default:
+                return BadRequest("Nội dung tải xuống không hợp lệ.");
+        }
+
+        return File(exportResult.Content, exportResult.ContentType, exportResult.FileName);
+    }
+
     public Dictionary<string, string?> GetRouteValues(int pageNumber)
     {
         return new Dictionary<string, string?>
@@ -172,6 +243,28 @@ public class DataByDateModel : PageModel
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = "true"
+        };
+    }
+
+    public Dictionary<string, string?> GetExportRouteValues(string section, string format, bool summaryOnly = false)
+    {
+        return new Dictionary<string, string?>
+        {
+            ["section"] = section,
+            ["format"] = format,
+            ["summaryOnly"] = summaryOnly.ToString(),
+            ["SelectedDate"] = SelectedDate,
+            ["SearchDate"] = SearchDate,
+            ["PageNumber"] = PageNumber.ToString(),
+            ["PartPageNumber"] = PartPageNumber.ToString(),
+            ["PartFilter.PartsName"] = PartFilter.PartsName,
+            ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Machine"] = PartFilter.Machine,
+            ["PartFilter.Shift"] = PartFilter.Shift,
+            ["PartFilter.ErrorName"] = PartFilter.ErrorName,
+            ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["TopN"] = TopN.ToString(),
+            ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
     }
 
@@ -230,6 +323,39 @@ public class DataByDateModel : PageModel
             x.PartsName,
             x.TotalCount
         }), ChartJsonOptions);
+    }
+
+    private async Task<IReadOnlyList<ExpensivePartSummaryItem>> BuildExpensivePartSummaryForDateAsync(
+        string selectedDate,
+        CancellationToken cancellationToken)
+    {
+        var expensiveParts = await _dbContext.ExpensiveParts
+            .AsNoTracking()
+            .Where(x => !string.IsNullOrWhiteSpace(x.PartsName))
+            .OrderBy(x => x.UploadedAt)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        var expensivePartNames = expensiveParts
+            .Where(x => !string.IsNullOrWhiteSpace(x.PartsName))
+            .Select(x => x.PartsName!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (expensivePartNames.Count == 0)
+        {
+            return [];
+        }
+
+        var entries = await _dbContext.RetryLogEntries
+            .AsNoTracking()
+            .Where(entry => entry.Date == selectedDate &&
+                            entry.PartsName != null &&
+                            expensivePartNames.Contains(entry.PartsName) &&
+                            (entry.ErrorName == null || entry.ErrorName != "Vision Retry"))
+            .ToListAsync(cancellationToken);
+
+        return ExpensivePartAnalysisService.Summarize(entries, expensiveParts);
     }
 }
 
