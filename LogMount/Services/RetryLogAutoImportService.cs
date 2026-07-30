@@ -2,8 +2,6 @@ namespace LogMount.Services;
 
 public class RetryLogAutoImportService : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(2);
-
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<RetryLogAutoImportService> _logger;
@@ -40,9 +38,9 @@ public class RetryLogAutoImportService : BackgroundService
     private static TimeSpan GetDelayToNextRun(DateTime now)
     {
         var currentSlot = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
-        var nextRun = currentSlot.Hour % 2 == 0 && now.Minute == 0 && now.Second == 0
+        var nextRun = now.Minute == 0 && now.Second == 0
             ? currentSlot
-            : currentSlot.AddHours(currentSlot.Hour % 2 == 0 ? 2 : 1);
+            : currentSlot.AddHours(1);
 
         return nextRun - now;
     }

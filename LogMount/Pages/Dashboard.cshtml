@@ -20,7 +20,16 @@
                     <label asp-for="SelectedMonth" class="form-label">Tháng hiển thị</label>
                     <input name="SelectedMonth" type="month" class="form-control" value="@Model.SelectedMonth?.Replace("/", "-")" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
+                    <label asp-for="TopN" class="form-label">Hiển thị</label>
+                    <select asp-for="TopN" class="form-select">
+                        @foreach (var option in Model.TopNChoices)
+                        {
+                            <option value="@option">@(option == 0 ? "Tất cả" : $"Top {option}")</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">Cập nhật biểu đồ</button>
                 </div>
             </form>
@@ -67,6 +76,40 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
+                            <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền ngày</h2>
+                            <div class="text-muted small">@Model.SelectedDate</div>
+                        </div>
+                        <span class="dashboard-total-badge">@Model.DailyExpensivePartCostTotal.ToString("N2")</span>
+                    </div>
+                    <div class="dashboard-chart-grid">
+                        <div class="dashboard-doughnut-wrapper">
+                            <canvas id="expensivePartDayCostChart"></canvas>
+                        </div>
+                        <div class="dashboard-bar-wrapper">
+                            <canvas id="expensivePartDayCostBarChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="dashboard-summary-table-wrapper mt-3">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parts Name</th>
+                                    <th class="text-end">Số tiền</th>
+                                    <th class="text-end">Tỷ lệ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensivePartDayCostTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6">
+            <div class="card shadow-sm h-100 dashboard-chart-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
                             <h2 class="h5 card-title mb-1">Lỗi linh kiện đắt tiền ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
@@ -90,6 +133,40 @@
                                 </tr>
                             </thead>
                             <tbody id="expensivePartDayTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6">
+            <div class="card shadow-sm h-100 dashboard-chart-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền tháng</h2>
+                            <div class="text-muted small">@Model.SelectedMonth</div>
+                        </div>
+                        <span class="dashboard-total-badge">@Model.MonthlyExpensivePartCostTotal.ToString("N2")</span>
+                    </div>
+                    <div class="dashboard-chart-grid">
+                        <div class="dashboard-doughnut-wrapper">
+                            <canvas id="expensivePartMonthCostChart"></canvas>
+                        </div>
+                        <div class="dashboard-bar-wrapper">
+                            <canvas id="expensivePartMonthCostBarChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="dashboard-summary-table-wrapper mt-3">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parts Name</th>
+                                    <th class="text-end">Số tiền</th>
+                                    <th class="text-end">Tỷ lệ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensivePartMonthCostTable"></tbody>
                         </table>
                     </div>
                 </div>
@@ -183,6 +260,7 @@
                     }
 
                     var total = chart.options.plugins.centerText.total || 0;
+                    var unit = chart.options.plugins.centerText.unit || 'lỗi';
                     if (total <= 0) {
                         return;
                     }
@@ -197,10 +275,10 @@
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = '#111827';
                     ctx.font = '700 22px sans-serif';
-                    ctx.fillText(total.toLocaleString(), x, y - 8);
+                    ctx.fillText(formatValue(total, unit), x, y - 8);
                     ctx.fillStyle = '#64748b';
                     ctx.font = '600 11px sans-serif';
-                    ctx.fillText('lỗi', x, y + 18);
+                    ctx.fillText(unit, x, y + 18);
                     ctx.restore();
                 }
             };
@@ -209,6 +287,12 @@
 
             function getPercent(value, total) {
                 return total ? (value * 100 / total).toFixed(1) : '0.0';
+            }
+
+            function formatValue(value, unit) {
+                return unit === 'tiền'
+                    ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    : Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 });
             }
 
             function escapeHtml(value) {
@@ -235,7 +319,7 @@
                 return url.pathname + url.search;
             }
 
-            function renderDoughnut(canvasId, data) {
+            function renderDoughnut(canvasId, data, unit) {
                 var canvas = document.getElementById(canvasId);
                 if (!canvas) {
                     return;
@@ -269,7 +353,8 @@
                         maintainAspectRatio: false,
                         plugins: {
                             centerText: {
-                                total: total
+                                total: total,
+                                unit: unit
                             },
                             legend: {
                                 display: false
@@ -279,7 +364,7 @@
                                     label: function (context) {
                                         var value = context.parsed || 0;
                                         var percent = getPercent(value, total);
-                                        return (context.label || '(Không có tên)') + ': ' + value.toLocaleString() + ' lỗi (' + percent + '%)';
+                                        return (context.label || '(Không có tên)') + ': ' + formatValue(value, unit) + ' ' + unit + ' (' + percent + '%)';
                                     }
                                 }
                             }
@@ -288,7 +373,7 @@
                 });
             }
 
-            function renderBarChart(canvasId, data) {
+            function renderBarChart(canvasId, data, unit) {
                 var canvas = document.getElementById(canvasId);
                 if (!canvas || !data.length) {
                     return;
@@ -316,7 +401,9 @@
                         scales: {
                             x: {
                                 beginAtZero: true,
-                                ticks: { precision: 0 }
+                                ticks: {
+                                    precision: unit === 'tiền' ? 2 : 0
+                                }
                             },
                             y: {
                                 ticks: {
@@ -328,7 +415,7 @@
                 });
             }
 
-            function renderSummaryTable(tableBodyId, data, linkBuilder) {
+            function renderSummaryTable(tableBodyId, data, linkBuilder, unit) {
                 var tableBody = document.getElementById(tableBodyId);
                 if (!tableBody) {
                     return;
@@ -351,16 +438,16 @@
 
                     return '<tr>' +
                         '<td class="text-truncate" title="' + label + '">' + labelHtml + '</td>' +
-                        '<td class="text-end fw-semibold">' + item.value.toLocaleString() + '</td>' +
+                        '<td class="text-end fw-semibold">' + formatValue(item.value, unit) + '</td>' +
                         '<td class="text-end text-danger fw-semibold">' + percent + '%</td>' +
                     '</tr>';
                 }).join('');
             }
 
-            function renderDashboardBlock(doughnutId, barId, tableId, data, linkBuilder) {
-                renderDoughnut(doughnutId, data);
-                renderBarChart(barId, data);
-                renderSummaryTable(tableId, data, linkBuilder);
+            function renderDashboardBlock(doughnutId, barId, tableId, data, linkBuilder, unit) {
+                renderDoughnut(doughnutId, data, unit);
+                renderBarChart(barId, data, unit);
+                renderSummaryTable(tableId, data, linkBuilder, unit);
             }
 
             var dayDataUrl = '@Url.Page("/DataByDate")';
@@ -398,21 +485,19 @@
                 });
             }
 
-            renderDashboardBlock('dailyErrorChart', 'dailyErrorBarChart', 'dailyErrorTable', @Html.Raw(Model.DailyErrorChartJson), buildDayErrorUrl);
-            renderDashboardBlock('expensivePartDayChart', 'expensivePartDayBarChart', 'expensivePartDayTable', @Html.Raw(Model.ExpensivePartDayChartJson), buildDayPartUrl);
-            renderDashboardBlock('monthlyErrorChart', 'monthlyErrorBarChart', 'monthlyErrorTable', @Html.Raw(Model.MonthlyErrorChartJson), buildMonthErrorUrl);
-            renderDashboardBlock('expensivePartMonthChart', 'expensivePartMonthBarChart', 'expensivePartMonthTable', @Html.Raw(Model.ExpensivePartMonthChartJson), buildMonthPartUrl);
+            renderDashboardBlock('dailyErrorChart', 'dailyErrorBarChart', 'dailyErrorTable', @Html.Raw(Model.DailyErrorChartJson), buildDayErrorUrl, 'lỗi');
+            renderDashboardBlock('expensivePartDayChart', 'expensivePartDayBarChart', 'expensivePartDayTable', @Html.Raw(Model.ExpensivePartDayChartJson), buildDayPartUrl, 'lỗi');
+            renderDashboardBlock('expensivePartDayCostChart', 'expensivePartDayCostBarChart', 'expensivePartDayCostTable', @Html.Raw(Model.ExpensivePartDayCostChartJson), buildDayPartUrl, 'tiền');
+            renderDashboardBlock('monthlyErrorChart', 'monthlyErrorBarChart', 'monthlyErrorTable', @Html.Raw(Model.MonthlyErrorChartJson), buildMonthErrorUrl, 'lỗi');
+            renderDashboardBlock('expensivePartMonthChart', 'expensivePartMonthBarChart', 'expensivePartMonthTable', @Html.Raw(Model.ExpensivePartMonthChartJson), buildMonthPartUrl, 'lỗi');
+            renderDashboardBlock('expensivePartMonthCostChart', 'expensivePartMonthCostBarChart', 'expensivePartMonthCostTable', @Html.Raw(Model.ExpensivePartMonthCostChartJson), buildMonthPartUrl, 'tiền');
 
             function getNextDashboardReloadTime(now) {
                 var next = new Date(now);
                 next.setMinutes(3, 0, 0);
 
-                if (next.getHours() % 2 !== 0) {
-                    next.setHours(next.getHours() + 1);
-                }
-
                 if (next <= now) {
-                    next.setHours(next.getHours() + 2);
+                    next.setHours(next.getHours() + 1);
                 }
 
                 return next;

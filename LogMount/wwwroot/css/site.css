@@ -240,7 +240,7 @@ body {
 }
 
 .dashboard-summary-table-wrapper {
-  max-height: 260px;
+  max-height: 760px;
   overflow: auto;
 }
 

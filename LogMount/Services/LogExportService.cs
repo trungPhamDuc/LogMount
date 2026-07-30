@@ -221,7 +221,7 @@ public class LogExportService : ILogExportService
             var row = rows[rowIndex];
             for (var col = 0; col < row.Length; col++)
             {
-                worksheet.Cell(rowIndex + 2, col + 1).Value = row[col];
+                SetXlsxCellValue(worksheet.Cell(rowIndex + 2, col + 1), headers[col], row[col]);
             }
         }
 
@@ -237,6 +237,41 @@ public class LogExportService : ILogExportService
             ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             FileName = fileName
         };
+    }
+
+    private static void SetXlsxCellValue(IXLCell cell, string header, string value)
+    {
+        if (IsIntegerColumn(header) &&
+            int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+        {
+            cell.Value = intValue;
+            cell.Style.NumberFormat.Format = "0";
+            return;
+        }
+
+        if (IsDecimalColumn(header) &&
+            decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var decimalValue))
+        {
+            cell.Value = decimalValue;
+            cell.Style.NumberFormat.Format = "#,##0.00";
+            return;
+        }
+
+        cell.Value = value;
+    }
+
+    private static bool IsIntegerColumn(string header)
+    {
+        return header.Equals("Số lần", StringComparison.OrdinalIgnoreCase) ||
+               header.Equals("Số lỗi", StringComparison.OrdinalIgnoreCase) ||
+               header.Equals("Số giá trị", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDecimalColumn(string header)
+    {
+        return header.Equals("Giá 1 con", StringComparison.OrdinalIgnoreCase) ||
+               header.Equals("Tổng giá tiền", StringComparison.OrdinalIgnoreCase) ||
+               header.Equals("Số tiền", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string SanitizeFileName(string fileName)
