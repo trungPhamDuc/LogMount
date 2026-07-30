@@ -10,7 +10,7 @@ namespace LogMount.Pages;
 
 internal static class IndexUploadLimits
 {
-    public const long MaxFileSize = 200L * 1024 * 1024;
+    public const long MaxFileSize = 500L * 1024 * 1024;
     public const long MaxTotalUploadSize = 500L * 1024 * 1024;
 }
 
@@ -28,6 +28,7 @@ public class IndexModel : PageModel
     private readonly ILogDataStore _logDataStore;
     private readonly IPartDataStore _partDataStore;
     private readonly ILogExportService _exportService;
+    private readonly IRetryLogImportService _retryLogImportService;
     private readonly LogMountDbContext _dbContext;
     private readonly ILogger<IndexModel> _logger;
 
@@ -38,6 +39,7 @@ public class IndexModel : PageModel
         ILogDataStore logDataStore,
         IPartDataStore partDataStore,
         ILogExportService exportService,
+        IRetryLogImportService retryLogImportService,
         LogMountDbContext dbContext,
         ILogger<IndexModel> logger)
     {
@@ -47,6 +49,7 @@ public class IndexModel : PageModel
         _logDataStore = logDataStore;
         _partDataStore = partDataStore;
         _exportService = exportService;
+        _retryLogImportService = retryLogImportService;
         _dbContext = dbContext;
         _logger = logger;
     }
@@ -56,6 +59,9 @@ public class IndexModel : PageModel
 
     [BindProperty]
     public DateOnly? RetryLogDate { get; set; }
+
+    [BindProperty]
+    public string? RetryLogMonth { get; set; }
 
     [BindProperty]
     public IFormFile? PartListFile { get; set; }
@@ -135,7 +141,9 @@ public class IndexModel : PageModel
             try
             {
                 await using var stream = file.OpenReadStream();
-                var entries = await _parserService.ParseAsync(stream, file.FileName, cancellationToken);
+                var entries = (await _parserService.ParseAsync(stream, file.FileName, cancellationToken))
+                    .Where(RetryLogAnalysisService.IsRealError)
+                    .ToList();
 
                 if (entries.Count == 0)
                 {
@@ -218,7 +226,10 @@ public class IndexModel : PageModel
         {
             var outputFilePath = await _retryLogBatchService.RunAsync(RetryLogDate.Value, cancellationToken);
             await using var stream = System.IO.File.OpenRead(outputFilePath);
-            var entries = await _parserService.ParseAsync(stream, Path.GetFileName(outputFilePath), cancellationToken);
+            var fileName = Path.GetFileName(outputFilePath);
+            var entries = (await _parserService.ParseAsync(stream, Path.GetFileName(outputFilePath), cancellationToken))
+                .Where(RetryLogAnalysisService.IsRealError)
+                .ToList();
 
             if (entries.Count == 0)
             {
@@ -228,7 +239,6 @@ public class IndexModel : PageModel
 
             await HttpContext.Session.LoadAsync(cancellationToken);
             var dataKey = Guid.NewGuid().ToString("N");
-            var fileName = Path.GetFileName(outputFilePath);
             var uploadBatchId = Guid.NewGuid().ToString("N");
             var uploadedAt = DateTime.Now;
             foreach (var entry in entries)
@@ -239,19 +249,17 @@ public class IndexModel : PageModel
             }
 
             _logDataStore.Save(dataKey, entries, [fileName]);
-            var isSavedLogFile = await _dbContext.RetryLogEntries
-                .AsNoTracking()
-                .AnyAsync(entry => entry.SourceFileName == fileName, cancellationToken);
-            if (!isSavedLogFile)
-            {
-                await _dbContext.RetryLogEntries.AddRangeAsync(entries, cancellationToken);
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
+            var savedCount = await _retryLogImportService.SaveNewEntriesAsync(
+                entries,
+                fileName,
+                uploadBatchId,
+                uploadedAt,
+                cancellationToken);
 
             HttpContext.Session.SetString(SessionKeys.LogDataKey, dataKey);
             await HttpContext.Session.CommitAsync(cancellationToken);
 
-            TempData["StatusMessage"] = $"Đã tổng hợp và tải {entries.Count:N0} dòng nhật ký lỗi ngày {RetryLogDate.Value:dd/MM/yyyy}.";
+            TempData["StatusMessage"] = $"Đã tổng hợp và tải {entries.Count:N0} dòng nhật ký lỗi ngày {RetryLogDate.Value:dd/MM/yyyy}. Đã lưu mới {savedCount:N0} dòng vào CSDL.";
             return RedirectToPage(new { PageNumber = 1 });
         }
         catch (OperationCanceledException)
@@ -263,6 +271,68 @@ public class IndexModel : PageModel
         {
             _logger.LogError(ex, "Failed to load retry log for {RetryLogDate}.", RetryLogDate);
             TempData["ErrorMessage"] = $"Không thể tổng hợp nhật ký lỗi: {ex.Message}";
+            return RedirectToPage();
+        }
+    }
+
+    public async Task<IActionResult> OnPostLoadRetryLogMonthAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RetryLogMonth) ||
+            !DateOnly.TryParse($"{RetryLogMonth}-01", out var selectedMonth))
+        {
+            TempData["ErrorMessage"] = "Vui lòng chọn tháng cần lấy nhật ký lỗi.";
+            return RedirectToPage();
+        }
+
+        try
+        {
+            var outputFilePath = await _retryLogBatchService.RunMonthAsync(selectedMonth, cancellationToken);
+            await using var stream = System.IO.File.OpenRead(outputFilePath);
+            var fileName = Path.GetFileName(outputFilePath);
+            var entries = (await _parserService.ParseAsync(stream, fileName, cancellationToken))
+                .Where(RetryLogAnalysisService.IsRealError)
+                .ToList();
+
+            if (entries.Count == 0)
+            {
+                TempData["ErrorMessage"] = "Tệp nhật ký lỗi tổng hợp theo tháng không có dữ liệu lỗi hợp lệ.";
+                return RedirectToPage();
+            }
+
+            await HttpContext.Session.LoadAsync(cancellationToken);
+            var dataKey = Guid.NewGuid().ToString("N");
+            var uploadBatchId = Guid.NewGuid().ToString("N");
+            var uploadedAt = DateTime.Now;
+            foreach (var entry in entries)
+            {
+                entry.SourceFileName = fileName;
+                entry.UploadBatchId = uploadBatchId;
+                entry.UploadedAt = uploadedAt;
+            }
+
+            _logDataStore.Save(dataKey, entries, [fileName]);
+            var savedCount = await _retryLogImportService.SaveNewEntriesAsync(
+                entries,
+                fileName,
+                uploadBatchId,
+                uploadedAt,
+                cancellationToken);
+
+            HttpContext.Session.SetString(SessionKeys.LogDataKey, dataKey);
+            await HttpContext.Session.CommitAsync(cancellationToken);
+
+            TempData["StatusMessage"] = $"Đã tổng hợp và tải {entries.Count:N0} dòng nhật ký lỗi tháng {selectedMonth:MM/yyyy}. Đã lưu mới {savedCount:N0} dòng vào CSDL.";
+            return RedirectToPage(new { PageNumber = 1 });
+        }
+        catch (OperationCanceledException)
+        {
+            TempData["ErrorMessage"] = "Đã hủy quá trình tổng hợp nhật ký lỗi theo tháng.";
+            return RedirectToPage();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load monthly retry log via batch.");
+            TempData["ErrorMessage"] = $"Không thể tổng hợp nhật ký lỗi theo tháng: {ex.Message}";
             return RedirectToPage();
         }
     }
@@ -365,6 +435,7 @@ public class IndexModel : PageModel
         StatusMessage = TempData["StatusMessage"] as string;
         ErrorMessage = TempData["ErrorMessage"] as string;
         RetryLogDate ??= DateOnly.FromDateTime(DateTime.Today);
+        RetryLogMonth ??= DateTime.Today.ToString("yyyy-MM");
 
         await HttpContext.Session.LoadAsync(cancellationToken);
 

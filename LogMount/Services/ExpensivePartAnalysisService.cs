@@ -24,7 +24,7 @@ public static class ExpensivePartAnalysisService
         return logEntries
             .Where(e => !string.IsNullOrWhiteSpace(e.PartsName) &&
                         costsByPartName.ContainsKey(e.PartsName!) &&
-                        !IsVisionRetry(e.ErrorName))
+                        RetryLogAnalysisService.IsRealError(e))
             .Select(e =>
             {
                 var (lineNumber, side, machine) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
@@ -229,9 +229,6 @@ public static class ExpensivePartAnalysisService
         var trimmed = value.Trim();
         return query.Where(x => selector(x).Contains(trimmed, StringComparison.OrdinalIgnoreCase));
     }
-
-    private static bool IsVisionRetry(string? errorName) =>
-        string.Equals(errorName?.Trim(), "Vision Retry", StringComparison.OrdinalIgnoreCase);
 
     // Ca ngày: 08:00–19:59; ca đêm: 20:00–07:59.
     private static string GetShift(string? occurrenceTime)

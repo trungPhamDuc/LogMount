@@ -10,7 +10,7 @@ public static class RetryLogAnalysisService
         IReadOnlyList<RetryLogEntry> entries,
         LogFilterCriteria criteria)
     {
-        IEnumerable<RetryLogEntry> query = entries;
+        IEnumerable<RetryLogEntry> query = entries.Where(IsRealError);
 
         query = ApplyContainsFilter(query, criteria.Date, e => e.Date);
         query = ApplyContainsFilter(query, criteria.Line, e => e.Line);
@@ -37,6 +37,7 @@ public static class RetryLogAnalysisService
     public static IReadOnlyList<ErrorSummaryItem> SummarizeErrors(IReadOnlyList<RetryLogEntry> entries)
     {
         return entries
+            .Where(IsRealError)
             .GroupBy(e => new { e.ErrorName, e.ErrorNo })
             .Select(g => new ErrorSummaryItem
             {
@@ -66,27 +67,36 @@ public static class RetryLogAnalysisService
 
     public static IReadOnlyList<ColumnSummaryItem> SummarizeColumns(IReadOnlyList<RetryLogEntry> entries)
     {
+        var realErrors = entries
+            .Where(IsRealError)
+            .ToList();
+
         return
         [
-            BuildColumnSummary("Date", entries, e => e.Date),
-            BuildColumnSummary("Line", entries, e => e.Line),
-            BuildColumnSummary("Language", entries, e => e.Language),
-            BuildColumnSummary("Occurrence Time", entries, e => e.OccurrenceTime),
-            BuildColumnSummary("Lot Name", entries, e => e.LotName),
-            BuildColumnSummary("Error No.", entries, e => e.ErrorNo),
-            BuildColumnSummary("Error Name", entries, e => e.ErrorName),
-            BuildColumnSummary("Lane", entries, e => e.Lane),
-            BuildColumnSummary("Table", entries, e => e.Table),
-            BuildColumnSummary("Parts No.", entries, e => e.PartsNo),
-            BuildColumnSummary("Parts Name", entries, e => e.PartsName),
-            BuildColumnSummary("Head No.", entries, e => e.HeadNo),
-            BuildColumnSummary("Nozzle Type", entries, e => e.NozzleType),
-            BuildColumnSummary("Feeder No.", entries, e => e.FeederNo),
-            BuildColumnSummary("Feeder ID", entries, e => e.FeederId),
-            BuildColumnSummary("Cart ID", entries, e => e.CartId),
-            BuildColumnSummary("Vis Error No.", entries, e => e.VisErrorNo),
-            BuildColumnSummary("Error Vacuum", entries, e => e.ErrorVacuum)
+            BuildColumnSummary("Date", realErrors, e => e.Date),
+            BuildColumnSummary("Line", realErrors, e => e.Line),
+            BuildColumnSummary("Language", realErrors, e => e.Language),
+            BuildColumnSummary("Occurrence Time", realErrors, e => e.OccurrenceTime),
+            BuildColumnSummary("Lot Name", realErrors, e => e.LotName),
+            BuildColumnSummary("Error No.", realErrors, e => e.ErrorNo),
+            BuildColumnSummary("Error Name", realErrors, e => e.ErrorName),
+            BuildColumnSummary("Lane", realErrors, e => e.Lane),
+            BuildColumnSummary("Table", realErrors, e => e.Table),
+            BuildColumnSummary("Parts No.", realErrors, e => e.PartsNo),
+            BuildColumnSummary("Parts Name", realErrors, e => e.PartsName),
+            BuildColumnSummary("Head No.", realErrors, e => e.HeadNo),
+            BuildColumnSummary("Nozzle Type", realErrors, e => e.NozzleType),
+            BuildColumnSummary("Feeder No.", realErrors, e => e.FeederNo),
+            BuildColumnSummary("Feeder ID", realErrors, e => e.FeederId),
+            BuildColumnSummary("Cart ID", realErrors, e => e.CartId),
+            BuildColumnSummary("Vis Error No.", realErrors, e => e.VisErrorNo),
+            BuildColumnSummary("Error Vacuum", realErrors, e => e.ErrorVacuum)
         ];
+    }
+
+    public static bool IsRealError(RetryLogEntry entry)
+    {
+        return !IsErrorNoZero(entry.ErrorNo) && !IsVisionRetry(entry.ErrorName);
     }
 
     private static IEnumerable<RetryLogEntry> ApplyContainsFilter(
@@ -102,6 +112,12 @@ public static class RetryLogAnalysisService
         var trimmed = value.Trim();
         return query.Where(e => selector(e)?.Contains(trimmed, StringComparison.OrdinalIgnoreCase) == true);
     }
+
+    private static bool IsErrorNoZero(string? errorNo) =>
+        string.Equals(errorNo?.Trim(), "0", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsVisionRetry(string? errorName) =>
+        string.Equals(errorName?.Trim(), "Vision Retry", StringComparison.OrdinalIgnoreCase);
 
     private static ColumnSummaryItem BuildColumnSummary(
         string columnName,

@@ -1,4 +1,4 @@
-﻿@page
+﻿@page "/Analysis"
 @model IndexModel
 @{
     ViewData["Title"] = "Phân tích nhật ký lỗi";
@@ -7,7 +7,7 @@
 <div class="logmount-page">
     <div class="page-header mb-4">
         <h1 class="h2 mb-1">Phân tích nhật ký lỗi</h1>
-        <p class="text-muted mb-0">Tải lên một hoặc nhiều tệp nhật ký (.csv, .xlsx, .xls) — hỗ trợ tối đa 200 MB/tệp, tổng 500 MB.</p>
+        <p class="text-muted mb-0">Tải lên một hoặc nhiều tệp nhật ký (.csv, .xlsx, .xls) — hỗ trợ tối đa 500 MB/tệp, tổng 500 MB.</p>
     </div>
 
     @if (!string.IsNullOrEmpty(Model.StatusMessage))
@@ -40,6 +40,25 @@
                 </div>
                 <div class="col-md-8">
                     <button type="submit" class="btn btn-success">Tổng hợp &amp; tải nhật ký lỗi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-body">
+            <h2 class="h5 card-title">Lấy nhật ký lỗi theo tháng</h2>
+            <p class="text-muted small mb-3">
+                Chọn tháng; hệ thống sẽ cập nhật tên <code>RetryLogyyyyMM**.csv</code> trong tệp batch,
+                chạy tổng hợp và chỉ lưu các dòng mới chưa có trong CSDL.
+            </p>
+            <form method="post" asp-page-handler="LoadRetryLogMonth" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label asp-for="RetryLogMonth" class="form-label">Tháng log</label>
+                    <input asp-for="RetryLogMonth" type="month" class="form-control" required />
+                </div>
+                <div class="col-md-8">
+                    <button type="submit" class="btn btn-success">Tổng hợp &amp; tải nhật ký lỗi theo tháng</button>
                 </div>
             </form>
         </div>

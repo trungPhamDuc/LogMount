@@ -23,7 +23,10 @@ builder.Services.Configure<FormOptions>(options =>
     options.MemoryBufferThreshold = int.MaxValue;
 });
 
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AddPageRoute("/Dashboard", "");
+});
 builder.Services.AddDbContext<LogMountDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -37,11 +40,13 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 builder.Services.AddScoped<IRetryLogParserService, RetryLogParserService>();
+builder.Services.AddScoped<IRetryLogImportService, RetryLogImportService>();
 builder.Services.AddSingleton<IRetryLogBatchService, RetryLogBatchService>();
 builder.Services.AddScoped<IPartListParserService, PartListParserService>();
 builder.Services.AddSingleton<ILogDataStore, MemoryLogDataStore>();
 builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();
 builder.Services.AddSingleton<ILogExportService, LogExportService>();
+builder.Services.AddHostedService<RetryLogAutoImportService>();
 
 var app = builder.Build();
 

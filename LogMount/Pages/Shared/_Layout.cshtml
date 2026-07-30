@@ -11,15 +11,21 @@
 <body>
     @{
         var currentPage = ViewContext.RouteData.Values["page"]?.ToString() ?? string.Empty;
+        var isDashboardPage = currentPage.Equals("/Dashboard", StringComparison.OrdinalIgnoreCase);
         var isAnalysisPage = currentPage.Equals("/Index", StringComparison.OrdinalIgnoreCase) ||
                              currentPage.Equals("/ExpensiveParts", StringComparison.OrdinalIgnoreCase);
         var isDataByDatePage = currentPage.Equals("/DataByDate", StringComparison.OrdinalIgnoreCase);
+        var isDataByMonthPage = currentPage.Equals("/DataByMonth", StringComparison.OrdinalIgnoreCase);
     }
 
     <div class="app-shell">
         <aside class="app-sidebar">
-            <a class="sidebar-brand" asp-area="" asp-page="/Index">LogMount</a>
+            <a class="sidebar-brand" asp-area="" asp-page="/Dashboard">LogMount</a>
             <nav class="sidebar-nav" aria-label="Dashboard">
+                <a class="sidebar-link @(isDashboardPage ? "active" : "")" asp-area="" asp-page="/Dashboard">
+                    <span class="sidebar-link-title">Trang chủ</span>
+                    <span class="sidebar-link-subtitle">Biểu đồ tổng hợp</span>
+                </a>
                 <a class="sidebar-link @(isAnalysisPage ? "active" : "")" asp-area="" asp-page="/Index">
                     <span class="sidebar-link-title">Phân tích retryLog</span>
                     <span class="sidebar-link-subtitle">Tải lên, lọc và tổng hợp lỗi</span>
@@ -27,6 +33,10 @@
                 <a class="sidebar-link @(isDataByDatePage ? "active" : "")" asp-area="" asp-page="/DataByDate">
                     <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
                     <span class="sidebar-link-subtitle">Xem dữ liệu đã tải lên trong CSDL</span>
+                </a>
+                <a class="sidebar-link @(isDataByMonthPage ? "active" : "")" asp-area="" asp-page="/DataByMonth">
+                    <span class="sidebar-link-title">Xem dữ liệu theo tháng</span>
+                    <span class="sidebar-link-subtitle">Tổng hợp dữ liệu theo tháng</span>
                 </a>
             </nav>
         </aside>

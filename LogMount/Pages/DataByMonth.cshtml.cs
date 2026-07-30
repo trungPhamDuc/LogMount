@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LogMount.Pages;
 
-public class DataByDateModel : PageModel
+public class DataByMonthModel : PageModel
 {
     private const int PageSize = 100;
     private const int PartPageSize = 100;
@@ -21,31 +21,31 @@ public class DataByDateModel : PageModel
     private readonly LogMountDbContext _dbContext;
     private readonly ILogExportService _exportService;
 
-    public DataByDateModel(LogMountDbContext dbContext, ILogExportService exportService)
+    public DataByMonthModel(LogMountDbContext dbContext, ILogExportService exportService)
     {
         _dbContext = dbContext;
         _exportService = exportService;
     }
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
-    public string? SelectedDate { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public string? SelectedMonth { get; set; }
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
-    public string? SearchDate { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public string? SearchMonth { get; set; }
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    [BindProperty(SupportsGet = true)]
     public int PartPageNumber { get; set; } = 1;
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    [BindProperty(SupportsGet = true)]
     public ExpensivePartFilterCriteria PartFilter { get; set; } = new();
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    [BindProperty(SupportsGet = true)]
     public int TopN { get; set; } = 10;
 
-    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    [BindProperty(SupportsGet = true)]
     public bool ShowExpensiveParts { get; set; }
 
     [TempData]
@@ -54,12 +54,11 @@ public class DataByDateModel : PageModel
     [TempData]
     public string? ErrorMessage { get; set; }
 
-    public IReadOnlyList<string> AvailableDates { get; set; } = [];
+    public IReadOnlyList<string> AvailableMonths { get; set; } = [];
+    public IReadOnlyList<string> DisplayMonths { get; set; } = [];
     public IReadOnlyList<RetryLogEntry> Entries { get; set; } = [];
     public int TotalRecords { get; set; }
     public int TotalPages { get; set; }
-    public IReadOnlyList<DailyRetryLogSummary> DailySummaries { get; set; } = [];
-    public IReadOnlyList<DailyRetryLogSummary> DisplayDailySummaries { get; set; } = [];
     public IReadOnlyList<int> TopNChoices { get; } = TopNOptions;
     public int ExpensivePartCount { get; set; }
     public IReadOnlyList<ExpensivePartSummaryItem> ExpensivePartSummary { get; set; } = [];
@@ -67,59 +66,39 @@ public class DataByDateModel : PageModel
     public IReadOnlyList<ExpensivePartSummaryItem> CountExpensivePartSummary { get; set; } = [];
     public IReadOnlyList<ExpensivePartSummaryItem> PagedFilteredExpensivePartSummary { get; set; } = [];
     public IReadOnlyList<ExpensivePartTopItem> TopParts { get; set; } = [];
-    public int ExpensivePartTotalErrorCount { get; set; }
     public int FilteredExpensivePartErrorCount { get; set; }
     public int TotalPartPages { get; set; }
     public string ChartDataJson { get; set; } = "[]";
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        DailySummaries = await ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-            .Where(x => !string.IsNullOrWhiteSpace(x.Date))
-            .Select(x => x.Date!)
-            .Distinct()
-            .OrderByDescending(date => date)
-            .Select(date => new DailyRetryLogSummary
-            {
-                Date = date
-            })
-            .ToListAsync(cancellationToken);
+        AvailableMonths = await LoadAvailableMonthsAsync(cancellationToken);
+        SearchMonth = NormalizeMonth(SearchMonth);
 
-        SearchDate = SearchDate?.Trim();
-
-        var filteredDailySummaries = string.IsNullOrWhiteSpace(SearchDate)
-            ? DailySummaries
-            : DailySummaries
-                .Where(x => x.Date.Contains(SearchDate, StringComparison.OrdinalIgnoreCase))
+        DisplayMonths = string.IsNullOrWhiteSpace(SearchMonth)
+            ? AvailableMonths.Take(5).ToList()
+            : AvailableMonths
+                .Where(x => x.Contains(SearchMonth, StringComparison.OrdinalIgnoreCase))
+                .Take(5)
                 .ToList();
 
-        AvailableDates = DailySummaries
-            .Select(x => x.Date)
-            .ToList();
+        SelectedMonth = NormalizeMonth(SelectedMonth) ?? AvailableMonths.FirstOrDefault();
 
-        DisplayDailySummaries = filteredDailySummaries
-            .Take(5)
-            .ToList();
-
-        SelectedDate = string.IsNullOrWhiteSpace(SelectedDate)
-            ? AvailableDates.FirstOrDefault()
-            : SelectedDate.Trim();
-
-        if (string.IsNullOrWhiteSpace(SelectedDate))
+        if (string.IsNullOrWhiteSpace(SelectedMonth))
         {
             TotalPages = 1;
             return;
         }
 
-        var query = ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-            .Where(x => x.Date == SelectedDate);
+        var query = BuildMonthQuery(SelectedMonth);
 
         TotalRecords = await query.CountAsync(cancellationToken);
         TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
         PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
 
         Entries = await query
-            .OrderByDescending(x => x.UploadedAt)
+            .OrderBy(x => x.Date)
+            .ThenBy(x => x.OccurrenceTime)
             .ThenBy(x => x.Id)
             .Skip((PageNumber - 1) * PageSize)
             .Take(PageSize)
@@ -133,24 +112,24 @@ public class DataByDateModel : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync(CancellationToken cancellationToken)
     {
-        SelectedDate = SelectedDate?.Trim();
-        if (string.IsNullOrWhiteSpace(SelectedDate))
+        SelectedMonth = NormalizeMonth(SelectedMonth);
+        if (string.IsNullOrWhiteSpace(SelectedMonth))
         {
-            ErrorMessage = "Vui lòng chọn ngày cần xóa.";
-            return RedirectToPage("./DataByDate");
+            ErrorMessage = "Vui lòng chọn tháng cần xóa.";
+            return RedirectToPage("./DataByMonth");
         }
 
         var deletedCount = await _dbContext.RetryLogEntries
-            .Where(x => x.Date == SelectedDate)
+            .Where(x => x.Date != null && x.Date.StartsWith(SelectedMonth))
             .ExecuteDeleteAsync(cancellationToken);
 
         SuccessMessage = deletedCount > 0
-            ? $"Đã xóa dữ liệu retryLog ngày {SelectedDate} khỏi CSDL."
-            : $"Không tìm thấy dữ liệu retryLog ngày {SelectedDate} trong CSDL.";
+            ? $"Đã xóa dữ liệu retryLog tháng {SelectedMonth} khỏi CSDL."
+            : $"Không tìm thấy dữ liệu retryLog tháng {SelectedMonth} trong CSDL.";
 
-        return RedirectToPage("./DataByDate", new
+        return RedirectToPage("./DataByMonth", new
         {
-            SearchDate
+            SearchMonth
         });
     }
 
@@ -160,10 +139,10 @@ public class DataByDateModel : PageModel
         bool summaryOnly,
         CancellationToken cancellationToken)
     {
-        SelectedDate = SelectedDate?.Trim();
-        if (string.IsNullOrWhiteSpace(SelectedDate))
+        SelectedMonth = NormalizeMonth(SelectedMonth);
+        if (string.IsNullOrWhiteSpace(SelectedMonth))
         {
-            return BadRequest("Vui lòng chọn ngày cần tải xuống.");
+            return BadRequest("Vui lòng chọn tháng cần tải xuống.");
         }
 
         if (!Enum.TryParse<ExportFormat>(format, ignoreCase: true, out var exportFormat))
@@ -171,15 +150,15 @@ public class DataByDateModel : PageModel
             return BadRequest("Định dạng tải xuống không hợp lệ.");
         }
 
-        var baseFileName = $"du-lieu-ngay-{SelectedDate.Replace('/', '-')}";
+        var baseFileName = $"du-lieu-thang-{SelectedMonth.Replace('/', '-')}";
         FileExportResult exportResult;
 
         switch (section?.Trim().ToLowerInvariant())
         {
             case "logs":
-                var logRows = await ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-                    .Where(x => x.Date == SelectedDate)
-                    .OrderByDescending(x => x.UploadedAt)
+                var logRows = await BuildMonthQuery(SelectedMonth)
+                    .OrderBy(x => x.Date)
+                    .ThenBy(x => x.OccurrenceTime)
                     .ThenBy(x => x.Id)
                     .ToListAsync(cancellationToken);
 
@@ -192,8 +171,7 @@ public class DataByDateModel : PageModel
                 break;
 
             case "expensiveparts":
-                TopN = TopNOptions.Contains(TopN) ? TopN : 10;
-                var expensiveRows = await BuildExpensivePartSummaryForDateAsync(SelectedDate, cancellationToken);
+                var expensiveRows = await BuildExpensivePartSummaryForMonthAsync(SelectedMonth, cancellationToken);
                 var filteredRows = ExpensivePartAnalysisService.SortByCount(
                     ExpensivePartAnalysisService.Filter(expensiveRows, PartFilter),
                     PartFilter);
@@ -225,8 +203,8 @@ public class DataByDateModel : PageModel
     {
         return new Dictionary<string, string?>
         {
-            ["SelectedDate"] = SelectedDate,
-            ["SearchDate"] = SearchDate,
+            ["SelectedMonth"] = SelectedMonth,
+            ["SearchMonth"] = SearchMonth,
             ["PageNumber"] = pageNumber.ToString(),
             ["PartPageNumber"] = PartPageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
@@ -244,8 +222,8 @@ public class DataByDateModel : PageModel
     {
         return new Dictionary<string, string?>
         {
-            ["SelectedDate"] = SelectedDate,
-            ["SearchDate"] = SearchDate,
+            ["SelectedMonth"] = SelectedMonth,
+            ["SearchMonth"] = SearchMonth,
             ["PageNumber"] = PageNumber.ToString(),
             ["PartPageNumber"] = "1",
             ["TopN"] = TopN.ToString(),
@@ -257,8 +235,8 @@ public class DataByDateModel : PageModel
     {
         return new Dictionary<string, string?>
         {
-            ["SelectedDate"] = SelectedDate,
-            ["SearchDate"] = SearchDate,
+            ["SelectedMonth"] = SelectedMonth,
+            ["SearchMonth"] = SearchMonth,
             ["PageNumber"] = PageNumber.ToString(),
             ["PartPageNumber"] = pageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
@@ -279,8 +257,8 @@ public class DataByDateModel : PageModel
             ["section"] = section,
             ["format"] = format,
             ["summaryOnly"] = summaryOnly.ToString(),
-            ["SelectedDate"] = SelectedDate,
-            ["SearchDate"] = SearchDate,
+            ["SelectedMonth"] = SelectedMonth,
+            ["SearchMonth"] = SearchMonth,
             ["PageNumber"] = PageNumber.ToString(),
             ["PartPageNumber"] = PartPageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
@@ -295,40 +273,25 @@ public class DataByDateModel : PageModel
     }
 
     private async Task LoadExpensivePartSummaryAsync(
-        IQueryable<RetryLogEntry> selectedDateQuery,
+        IQueryable<RetryLogEntry> selectedMonthQuery,
         CancellationToken cancellationToken)
     {
         TopN = TopNOptions.Contains(TopN) ? TopN : 10;
 
-        var expensiveParts = await _dbContext.ExpensiveParts
-            .AsNoTracking()
-            .Where(x => !string.IsNullOrWhiteSpace(x.PartsName))
-            .OrderBy(x => x.UploadedAt)
-            .ThenBy(x => x.Id)
-            .ToListAsync(cancellationToken);
+        ExpensivePartSummary = await BuildExpensivePartSummaryForMonthAsync(
+            SelectedMonth ?? string.Empty,
+            cancellationToken,
+            selectedMonthQuery);
 
-        var expensivePartNames = expensiveParts
-            .Where(x => !string.IsNullOrWhiteSpace(x.PartsName))
-            .Select(x => x.PartsName!)
+        ExpensivePartCount = ExpensivePartSummary
+            .Select(x => x.PartsName)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        ExpensivePartCount = expensivePartNames.Count;
+            .Count();
 
         if (ExpensivePartCount == 0)
         {
             return;
         }
-
-        var entries = await selectedDateQuery
-            .Where(entry => entry.PartsName != null &&
-                            expensivePartNames.Contains(entry.PartsName) &&
-                            (entry.ErrorNo == null || entry.ErrorNo.Trim() != "0") &&
-                            (entry.ErrorName == null || entry.ErrorName.Trim().ToLower() != "vision retry"))
-            .ToListAsync(cancellationToken);
-
-        ExpensivePartSummary = ExpensivePartAnalysisService.Summarize(entries, expensiveParts);
-        ExpensivePartTotalErrorCount = ExpensivePartSummary.Sum(x => x.Count);
 
         var filtered = ExpensivePartAnalysisService.Filter(ExpensivePartSummary, PartFilter);
         FilteredExpensivePartSummary = ExpensivePartAnalysisService.SortByCount(filtered, PartFilter);
@@ -352,9 +315,10 @@ public class DataByDateModel : PageModel
         }), ChartJsonOptions);
     }
 
-    private async Task<IReadOnlyList<ExpensivePartSummaryItem>> BuildExpensivePartSummaryForDateAsync(
-        string selectedDate,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ExpensivePartSummaryItem>> BuildExpensivePartSummaryForMonthAsync(
+        string selectedMonth,
+        CancellationToken cancellationToken,
+        IQueryable<RetryLogEntry>? selectedMonthQuery = null)
     {
         var expensiveParts = await _dbContext.ExpensiveParts
             .AsNoTracking()
@@ -364,7 +328,6 @@ public class DataByDateModel : PageModel
             .ToListAsync(cancellationToken);
 
         var expensivePartNames = expensiveParts
-            .Where(x => !string.IsNullOrWhiteSpace(x.PartsName))
             .Select(x => x.PartsName!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -374,27 +337,57 @@ public class DataByDateModel : PageModel
             return [];
         }
 
-        var entries = await ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-            .Where(entry => entry.Date == selectedDate &&
-                            entry.PartsName != null &&
+        selectedMonthQuery ??= BuildMonthQuery(selectedMonth);
+
+        var entries = await selectedMonthQuery
+            .Where(entry => entry.PartsName != null &&
                             expensivePartNames.Contains(entry.PartsName))
             .ToListAsync(cancellationToken);
 
         return ExpensivePartAnalysisService.Summarize(entries, expensiveParts);
     }
 
-    private static IQueryable<RetryLogEntry> ApplyRealErrorFilter(IQueryable<RetryLogEntry> query)
+    private IQueryable<RetryLogEntry> BuildMonthQuery(string selectedMonth)
     {
-        return query.Where(x =>
-            (x.ErrorNo == null || x.ErrorNo.Trim() != "0") &&
-            (x.ErrorName == null || x.ErrorName.Trim().ToLower() != "vision retry"));
+        return _dbContext.RetryLogEntries
+            .AsNoTracking()
+            .Where(x => x.Date != null && x.Date.StartsWith(selectedMonth))
+            .Where(x =>
+                (x.ErrorNo == null || x.ErrorNo.Trim() != "0") &&
+                (x.ErrorName == null || x.ErrorName.Trim().ToLower() != "vision retry"));
     }
-}
 
-public class DailyRetryLogSummary
-{
-    public string Date { get; set; } = string.Empty;
-    public int TotalRecords { get; set; }
-    public int UploadedFileCount { get; set; }
-    public DateTime? LastUploadedAt { get; set; }
+    private async Task<IReadOnlyList<string>> LoadAvailableMonthsAsync(CancellationToken cancellationToken)
+    {
+        var dates = await BuildRealErrorQuery()
+            .Where(x => !string.IsNullOrWhiteSpace(x.Date) && x.Date!.Length >= 7)
+            .Select(x => x.Date!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return dates
+            .Select(x => x[..7])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? NormalizeMonth(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().Replace('-', '/');
+    }
+
+    private IQueryable<RetryLogEntry> BuildRealErrorQuery()
+    {
+        return _dbContext.RetryLogEntries
+            .AsNoTracking()
+            .Where(x =>
+                (x.ErrorNo == null || x.ErrorNo.Trim() != "0") &&
+                (x.ErrorName == null || x.ErrorName.Trim().ToLower() != "vision retry"));
+    }
 }

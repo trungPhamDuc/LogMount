@@ -198,6 +198,73 @@ body {
   height: clamp(320px, 50vh, 560px);
 }
 
+.dashboard-chart-wrapper {
+  position: relative;
+  min-height: 360px;
+  height: clamp(360px, 48vh, 520px);
+}
+
+.dashboard-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(260px, 1.15fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.dashboard-doughnut-wrapper {
+  position: relative;
+  min-height: 260px;
+  height: 300px;
+}
+
+.dashboard-bar-wrapper {
+  position: relative;
+  min-height: 260px;
+  height: 300px;
+}
+
+.dashboard-chart-card {
+  border: 0;
+}
+
+.dashboard-total-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  color: #991b1b;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-summary-table-wrapper {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.dashboard-summary-table-wrapper th,
+.dashboard-summary-table-wrapper td {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.dashboard-summary-table-wrapper td:first-child {
+  max-width: 320px;
+}
+
+.dashboard-table-link {
+  color: #111827;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.dashboard-table-link:hover {
+  color: #111827;
+  text-decoration: underline;
+}
+
 .part-detail-link {
   text-decoration: none;
 }
@@ -224,5 +291,9 @@ body {
 
   .app-content {
     padding: 1rem;
+  }
+
+  .dashboard-chart-grid {
+    grid-template-columns: 1fr;
   }
 }
