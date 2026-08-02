@@ -12,6 +12,13 @@ public interface IRetryLogImportService
         string uploadBatchId,
         DateTime uploadedAt,
         CancellationToken cancellationToken = default);
+
+    Task<int> ReplaceEntriesFromFileAsync(
+        IReadOnlyList<RetryLogEntry> entries,
+        string sourceFileName,
+        string uploadBatchId,
+        DateTime uploadedAt,
+        CancellationToken cancellationToken = default);
 }
 
 public class RetryLogImportService : IRetryLogImportService
@@ -81,6 +88,39 @@ public class RetryLogImportService : IRetryLogImportService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return newEntries.Count;
+    }
+
+    public async Task<int> ReplaceEntriesFromFileAsync(
+        IReadOnlyList<RetryLogEntry> entries,
+        string sourceFileName,
+        string uploadBatchId,
+        DateTime uploadedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var realEntries = entries
+            .Where(RetryLogAnalysisService.IsRealError)
+            .ToList();
+
+        await _dbContext.RetryLogEntries
+            .Where(entry => entry.SourceFileName == sourceFileName)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (realEntries.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (var entry in realEntries)
+        {
+            entry.SourceFileName = sourceFileName;
+            entry.UploadBatchId = uploadBatchId;
+            entry.UploadedAt = uploadedAt;
+        }
+
+        await _dbContext.RetryLogEntries.AddRangeAsync(realEntries, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return realEntries.Count;
     }
 
     private static string BuildKey(RetryLogEntry entry)

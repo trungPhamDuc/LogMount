@@ -60,7 +60,7 @@ public class RetryLogAutoImportService : BackgroundService
             var fileName = Path.GetFileName(outputFilePath);
             var entries = await parserService.ParseAsync(stream, fileName, cancellationToken);
 
-            var savedCount = await importService.SaveNewEntriesAsync(
+            var savedCount = await importService.ReplaceEntriesFromFileAsync(
                 entries,
                 fileName,
                 Guid.NewGuid().ToString("N"),
@@ -68,7 +68,7 @@ public class RetryLogAutoImportService : BackgroundService
                 cancellationToken);
 
             _logger.LogInformation(
-                "Auto imported retry log for {Date}. Parsed {ParsedCount} rows, saved {SavedCount} new rows.",
+                "Auto imported retry log for {Date}. Parsed {ParsedCount} rows, replaced {SavedCount} rows.",
                 date,
                 entries.Count,
                 savedCount);

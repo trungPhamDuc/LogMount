@@ -18,6 +18,9 @@ public class RetryLogBatchService : IRetryLogBatchService
     private static readonly Regex MonthlyRetryLogNamePattern = new(
         @"RetryLog\d{6}\*\*\.csv",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex OutputRetryLogNamePattern = new(
+        @"TotalRetryLog(?:\d{8}|\d{6}\*\*|\d{6}|\d{2})\.csv",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex PauseCommandPattern = new(
         @"(?im)^\s*pause\s*$",
         RegexOptions.CultureInvariant);
@@ -85,11 +88,25 @@ public class RetryLogBatchService : IRetryLogBatchService
             var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
             var updatedBatchContent = DailyRetryLogNamePattern.Replace(batchContent, retryLogFileName);
             updatedBatchContent = MonthlyRetryLogNamePattern.Replace(updatedBatchContent, retryLogFileName);
+            updatedBatchContent = OutputRetryLogNamePattern.Replace(
+                updatedBatchContent,
+                Path.GetFileName(outputFilePath));
             updatedBatchContent = PauseCommandPattern.Replace(updatedBatchContent, string.Empty);
 
             if (!string.Equals(batchContent, updatedBatchContent, StringComparison.Ordinal))
             {
                 await File.WriteAllTextAsync(batchFilePath, updatedBatchContent, new UTF8Encoding(false), cancellationToken);
+            }
+
+            var outputDirectory = Path.GetDirectoryName(outputFilePath);
+            if (!string.IsNullOrWhiteSpace(outputDirectory))
+            {
+                Directory.CreateDirectory(outputDirectory);
+            }
+
+            if (File.Exists(outputFilePath))
+            {
+                File.Delete(outputFilePath);
             }
 
             var startInfo = new ProcessStartInfo
