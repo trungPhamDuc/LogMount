@@ -79,7 +79,7 @@
                             <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.DailyExpensivePartCostTotal.ToString("N2")</span>
+                        <span class="dashboard-total-badge">@Model.DailyExpensivePartCostTotal.ToString("N0") đồng</span>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -147,7 +147,7 @@
                             <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền tháng</h2>
                             <div class="text-muted small">@Model.SelectedMonth</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.MonthlyExpensivePartCostTotal.ToString("N2")</span>
+                        <span class="dashboard-total-badge">@Model.MonthlyExpensivePartCostTotal.ToString("N0") đồng</span>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -290,8 +290,8 @@
             }
 
             function formatValue(value, unit) {
-                return unit === 'tiền'
-                    ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                return unit === 'đồng'
+                    ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })
                     : Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 });
             }
 
@@ -402,7 +402,7 @@
                             x: {
                                 beginAtZero: true,
                                 ticks: {
-                                    precision: unit === 'tiền' ? 2 : 0
+                                    precision: 0
                                 }
                             },
                             y: {
@@ -487,10 +487,10 @@
 
             renderDashboardBlock('dailyErrorChart', 'dailyErrorBarChart', 'dailyErrorTable', @Html.Raw(Model.DailyErrorChartJson), buildDayErrorUrl, 'lỗi');
             renderDashboardBlock('expensivePartDayChart', 'expensivePartDayBarChart', 'expensivePartDayTable', @Html.Raw(Model.ExpensivePartDayChartJson), buildDayPartUrl, 'lỗi');
-            renderDashboardBlock('expensivePartDayCostChart', 'expensivePartDayCostBarChart', 'expensivePartDayCostTable', @Html.Raw(Model.ExpensivePartDayCostChartJson), buildDayPartUrl, 'tiền');
+            renderDashboardBlock('expensivePartDayCostChart', 'expensivePartDayCostBarChart', 'expensivePartDayCostTable', @Html.Raw(Model.ExpensivePartDayCostChartJson), buildDayPartUrl, 'đồng');
             renderDashboardBlock('monthlyErrorChart', 'monthlyErrorBarChart', 'monthlyErrorTable', @Html.Raw(Model.MonthlyErrorChartJson), buildMonthErrorUrl, 'lỗi');
             renderDashboardBlock('expensivePartMonthChart', 'expensivePartMonthBarChart', 'expensivePartMonthTable', @Html.Raw(Model.ExpensivePartMonthChartJson), buildMonthPartUrl, 'lỗi');
-            renderDashboardBlock('expensivePartMonthCostChart', 'expensivePartMonthCostBarChart', 'expensivePartMonthCostTable', @Html.Raw(Model.ExpensivePartMonthCostChartJson), buildMonthPartUrl, 'tiền');
+            renderDashboardBlock('expensivePartMonthCostChart', 'expensivePartMonthCostBarChart', 'expensivePartMonthCostTable', @Html.Raw(Model.ExpensivePartMonthCostChartJson), buildMonthPartUrl, 'đồng');
 
             function getNextDashboardReloadTime(now) {
                 var next = new Date(now);

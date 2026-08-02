@@ -218,8 +218,8 @@
                                                         </button>
                                                     </td>
                                                     <td class="text-end fw-semibold text-danger">@item.TotalCount.ToString("N0")</td>
-                                                    <td class="text-end text-muted">@item.Cost.ToString("N2")</td>
-                                                    <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td>
+                                                    <td class="text-end text-muted">@item.Cost.ToString("N0") đồng</td>
+                                                    <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N0") đồng</td>
                                                 </tr>
                                             }
                                         </tbody>
@@ -254,14 +254,14 @@
                                     <tr>
                                         <td class="fw-semibold">@item.PartsName</td><td>@item.Line</td><td>@item.Lane</td><td>@item.SideLabel (@item.Side)</td><td>@item.Machine</td><td>@item.FeederNo</td><td>@item.Shift</td>
                                         <td class="error-name-cell"><span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span></td>
-                                        <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N0") đồng</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
                                     </tr>
                                 }
                             </tbody>
                             <tfoot>
                                 <tr class="table-secondary fw-semibold">
                                     <td colspan="8">Tổng cộng (đã lọc)</td>
-                                    <td class="text-end text-danger">@Model.CountExpensivePartSummary.Sum(item => item.TotalCost).ToString("N2")</td>
+                                    <td class="text-end text-danger">@Model.CountExpensivePartSummary.Sum(item => item.TotalCost).ToString("N0") đồng</td>
                                     <td class="text-end">@Model.CountExpensivePartSummary.Sum(item => item.Count).ToString("N0")</td>
                                 </tr>
                             </tfoot>
@@ -300,14 +300,14 @@
                                         <tr>
                                             <td class="fw-semibold">@item.PartsName</td><td>@item.Line</td><td>@item.Lane</td><td>@item.SideLabel (@item.Side)</td><td>@item.Machine</td><td>@item.FeederNo</td><td>@item.OccurrenceTime</td><td>@item.Shift</td>
                                             <td class="error-name-cell"><span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span></td>
-                                            <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N2")</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                            <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N0") đồng</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
                                         </tr>
                                     }
                                 </tbody>
                                 <tfoot>
                                     <tr class="table-secondary fw-semibold">
                                         <td colspan="9">Tổng cộng (đã lọc)</td>
-                                        <td class="text-end text-danger">@Model.FilteredExpensivePartSummary.Sum(item => item.TotalCost).ToString("N2")</td>
+                                        <td class="text-end text-danger">@Model.FilteredExpensivePartSummary.Sum(item => item.TotalCost).ToString("N0") đồng</td>
                                         <td class="text-end">@Model.FilteredExpensivePartErrorCount.ToString("N0")</td>
                                     </tr>
                                 </tfoot>
