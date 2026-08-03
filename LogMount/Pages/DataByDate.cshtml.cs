@@ -43,6 +43,9 @@ public class DataByDateModel : PageModel
     public ExpensivePartFilterCriteria PartFilter { get; set; } = new();
 
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
+    public LogFilterCriteria Filter { get; set; } = new();
+
+    [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
     public int TopN { get; set; } = 10;
 
     [Microsoft.AspNetCore.Mvc.BindProperty(SupportsGet = true)]
@@ -111,8 +114,8 @@ public class DataByDateModel : PageModel
             return;
         }
 
-        var query = ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-            .Where(x => x.Date == SelectedDate);
+        var query = ApplyLogFilter(ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
+            .Where(x => x.Date == SelectedDate), Filter);
 
         TotalRecords = await query.CountAsync(cancellationToken);
         TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
@@ -177,8 +180,9 @@ public class DataByDateModel : PageModel
         switch (section?.Trim().ToLowerInvariant())
         {
             case "logs":
-                var logRows = await ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-                    .Where(x => x.Date == SelectedDate)
+                var logRows = await ApplyLogFilter(ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
+                    .Where(x => x.Date == SelectedDate),
+                    Filter)
                     .OrderByDescending(x => x.UploadedAt)
                     .ThenBy(x => x.Id)
                     .ToListAsync(cancellationToken);
@@ -235,6 +239,8 @@ public class DataByDateModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
@@ -267,6 +273,8 @@ public class DataByDateModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = "true"
         };
@@ -289,6 +297,8 @@ public class DataByDateModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
@@ -388,6 +398,25 @@ public class DataByDateModel : PageModel
         return query.Where(x =>
             (x.ErrorNo == null || x.ErrorNo.Trim() != "0") &&
             (x.ErrorName == null || x.ErrorName.Trim().ToLower() != "vision retry"));
+    }
+
+    private static IQueryable<RetryLogEntry> ApplyLogFilter(
+        IQueryable<RetryLogEntry> query,
+        LogFilterCriteria criteria)
+    {
+        if (!string.IsNullOrWhiteSpace(criteria.ErrorName))
+        {
+            var errorName = criteria.ErrorName.Trim();
+            query = query.Where(x => x.ErrorName != null && x.ErrorName.Contains(errorName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.PartsName))
+        {
+            var partsName = criteria.PartsName.Trim();
+            query = query.Where(x => x.PartsName != null && x.PartsName.Contains(partsName));
+        }
+
+        return query;
     }
 }
 

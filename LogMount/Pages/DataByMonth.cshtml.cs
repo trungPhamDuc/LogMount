@@ -43,6 +43,9 @@ public class DataByMonthModel : PageModel
     public ExpensivePartFilterCriteria PartFilter { get; set; } = new();
 
     [BindProperty(SupportsGet = true)]
+    public LogFilterCriteria Filter { get; set; } = new();
+
+    [BindProperty(SupportsGet = true)]
     public int TopN { get; set; } = 10;
 
     [BindProperty(SupportsGet = true)]
@@ -90,7 +93,7 @@ public class DataByMonthModel : PageModel
             return;
         }
 
-        var query = BuildMonthQuery(SelectedMonth);
+        var query = ApplyLogFilter(BuildMonthQuery(SelectedMonth), Filter);
 
         TotalRecords = await query.CountAsync(cancellationToken);
         TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
@@ -156,7 +159,7 @@ public class DataByMonthModel : PageModel
         switch (section?.Trim().ToLowerInvariant())
         {
             case "logs":
-                var logRows = await BuildMonthQuery(SelectedMonth)
+                var logRows = await ApplyLogFilter(BuildMonthQuery(SelectedMonth), Filter)
                     .OrderBy(x => x.Date)
                     .ThenBy(x => x.OccurrenceTime)
                     .ThenBy(x => x.Id)
@@ -213,6 +216,8 @@ public class DataByMonthModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
@@ -245,6 +250,8 @@ public class DataByMonthModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = "true"
         };
@@ -267,6 +274,8 @@ public class DataByMonthModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
+            ["Filter.ErrorName"] = Filter.ErrorName,
+            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
@@ -389,5 +398,24 @@ public class DataByMonthModel : PageModel
             .Where(x =>
                 (x.ErrorNo == null || x.ErrorNo.Trim() != "0") &&
                 (x.ErrorName == null || x.ErrorName.Trim().ToLower() != "vision retry"));
+    }
+
+    private static IQueryable<RetryLogEntry> ApplyLogFilter(
+        IQueryable<RetryLogEntry> query,
+        LogFilterCriteria criteria)
+    {
+        if (!string.IsNullOrWhiteSpace(criteria.ErrorName))
+        {
+            var errorName = criteria.ErrorName.Trim();
+            query = query.Where(x => x.ErrorName != null && x.ErrorName.Contains(errorName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.PartsName))
+        {
+            var partsName = criteria.PartsName.Trim();
+            query = query.Where(x => x.PartsName != null && x.PartsName.Contains(partsName));
+        }
+
+        return query;
     }
 }

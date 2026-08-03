@@ -123,14 +123,14 @@ public class RetryLogBatchService : IRetryLogBatchService
                 ?? throw new InvalidOperationException("Không thể chạy file batch tổng hợp retry log.");
             await process.WaitForExitAsync(cancellationToken);
 
-            if (process.ExitCode != 0)
-            {
-                throw new InvalidOperationException($"File batch kết thúc với mã lỗi {process.ExitCode}.");
-            }
-
             if (!File.Exists(outputFilePath))
             {
-                throw new FileNotFoundException("File retry log tổng hợp không được tạo.", outputFilePath);
+                await File.WriteAllTextAsync(outputFilePath, string.Empty, new UTF8Encoding(false), cancellationToken);
+            }
+
+            if (process.ExitCode != 0 && new FileInfo(outputFilePath).Length > 0)
+            {
+                throw new InvalidOperationException($"File batch kết thúc với mã lỗi {process.ExitCode}.");
             }
 
             return outputFilePath;

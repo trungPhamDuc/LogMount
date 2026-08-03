@@ -41,6 +41,11 @@ public class RetryLogParserService : IRetryLogParserService
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         var content = await reader.ReadToEndAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return [];
+        }
+
         var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
 
         var (headerLineIndex, headers) = FindHeaderLine(lines);
