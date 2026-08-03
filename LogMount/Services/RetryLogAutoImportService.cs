@@ -6,11 +6,14 @@ namespace LogMount.Services;
 public class RetryLogAutoImportService : BackgroundService
 {
     private static readonly TimeSpan PreviousDayReimportTime = new(8, 45, 0);
+    private static readonly string PreviousDayReimportStateFilePath = Path.Combine(
+        Path.GetTempPath(),
+        "LogMount",
+        "previous-day-reimport-state.txt");
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<RetryLogAutoImportService> _logger;
-    private DateOnly? _lastPreviousDayReimportDate;
 
     public RetryLogAutoImportService(
         IServiceScopeFactory scopeFactory,
@@ -35,7 +38,7 @@ public class RetryLogAutoImportService : BackgroundService
             await ReimportPreviousDayIfDueAsync(now, stoppingToken);
 
             now = DateTime.Now;
-            var nextRunTime = GetNextRunTime(now, _lastPreviousDayReimportDate);
+            var nextRunTime = GetNextRunTime(now, GetLastPreviousDayReimportDate(DateOnly.FromDateTime(now)));
             var delay = nextRunTime - now;
             var shouldImportToday = IsHourlyRun(nextRunTime);
 
@@ -131,7 +134,8 @@ public class RetryLogAutoImportService : BackgroundService
     private async Task ReimportPreviousDayIfDueAsync(DateTime now, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(now);
-        if (now.TimeOfDay < PreviousDayReimportTime || _lastPreviousDayReimportDate == today)
+        if (now.TimeOfDay < PreviousDayReimportTime ||
+            GetLastPreviousDayReimportDate(today) == today)
         {
             return;
         }
@@ -163,7 +167,7 @@ public class RetryLogAutoImportService : BackgroundService
                 DateTime.Now,
                 cancellationToken);
 
-            _lastPreviousDayReimportDate = today;
+            SaveLastPreviousDayReimportDate(today);
 
             _logger.LogInformation(
                 "Reimported previous day retry log for {Date}. Deleted {DeletedCount} rows, parsed {ParsedCount} rows, saved {SavedCount} rows.",
@@ -179,5 +183,39 @@ public class RetryLogAutoImportService : BackgroundService
         {
             _logger.LogError(ex, "Previous day retry log reimport failed.");
         }
+    }
+
+    private static DateOnly? GetLastPreviousDayReimportDate(DateOnly today)
+    {
+        if (!File.Exists(PreviousDayReimportStateFilePath))
+        {
+            return null;
+        }
+
+        var stateText = File.ReadAllText(PreviousDayReimportStateFilePath).Trim();
+        if (!DateOnly.TryParseExact(stateText, "yyyy-MM-dd", out var stateDate))
+        {
+            File.Delete(PreviousDayReimportStateFilePath);
+            return null;
+        }
+
+        if (stateDate == today)
+        {
+            return stateDate;
+        }
+
+        File.Delete(PreviousDayReimportStateFilePath);
+        return null;
+    }
+
+    private static void SaveLastPreviousDayReimportDate(DateOnly date)
+    {
+        var stateDirectory = Path.GetDirectoryName(PreviousDayReimportStateFilePath);
+        if (!string.IsNullOrWhiteSpace(stateDirectory))
+        {
+            Directory.CreateDirectory(stateDirectory);
+        }
+
+        File.WriteAllText(PreviousDayReimportStateFilePath, date.ToString("yyyy-MM-dd"));
     }
 }
