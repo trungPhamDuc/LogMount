@@ -12,6 +12,8 @@ public interface ILogExportService
     FileExportResult ExportOverview(IReadOnlyList<ColumnSummaryItem> items, ExportFormat format, string baseFileName);
     FileExportResult ExportErrors(IReadOnlyList<ErrorSummaryItem> items, ExportFormat format, string baseFileName);
     FileExportResult ExportLogs(IReadOnlyList<RetryLogEntry> items, ExportFormat format, string baseFileName);
+    FileExportResult ExportErrorLogs(IReadOnlyList<ErrorLogEntry> items, ExportFormat format, string baseFileName);
+    FileExportResult ExportErrorLogSummary(IReadOnlyList<ErrorLogSummaryItem> items, ExportFormat format, string baseFileName);
     FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName);
 }
 
@@ -31,6 +33,16 @@ public class LogExportService : ILogExportService
     ];
 
     private static readonly string[] OverviewHeaders = ["Cột", "Giá trị", "Số giá trị"];
+
+    private static readonly string[] ErrorLogHeaders =
+    [
+        "Event Date", "Line", "Lane", "Table", "Error", "Event No.", "Program Name", "Details"
+    ];
+
+    private static readonly string[] ErrorLogSummaryHeaders =
+    [
+        "Error", "Event No.", "Số lần", "Date", "Line", "Lane", "Table"
+    ];
 
     private static readonly string[] ExpensivePartHeaders =
     [
@@ -91,6 +103,39 @@ public class LogExportService : ILogExportService
         });
 
         return Export("du-lieu-log", LogHeaders, rows, format, baseFileName);
+    }
+
+    public FileExportResult ExportErrorLogs(IReadOnlyList<ErrorLogEntry> items, ExportFormat format, string baseFileName)
+    {
+        var rows = items.Select(item => new string[]
+        {
+            item.EventDate ?? string.Empty,
+            item.Line ?? string.Empty,
+            item.Lane ?? string.Empty,
+            item.Table ?? string.Empty,
+            item.Error ?? string.Empty,
+            item.EventNo ?? string.Empty,
+            item.ProgramName ?? string.Empty,
+            item.Details ?? string.Empty
+        });
+
+        return Export("du-lieu-errorlog", ErrorLogHeaders, rows, format, baseFileName);
+    }
+
+    public FileExportResult ExportErrorLogSummary(IReadOnlyList<ErrorLogSummaryItem> items, ExportFormat format, string baseFileName)
+    {
+        var rows = items.Select(item => new string[]
+        {
+            item.Error,
+            item.EventNo,
+            item.Count.ToString(CultureInfo.InvariantCulture),
+            item.Dates,
+            item.Lines,
+            item.Lanes,
+            item.Tables
+        });
+
+        return Export("tong-hop-errorlog", ErrorLogSummaryHeaders, rows, format, baseFileName);
     }
 
     public FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName)

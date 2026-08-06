@@ -4,22 +4,22 @@ using System.Text.RegularExpressions;
 
 namespace LogMount.Services;
 
-public interface IRetryLogBatchService
+public interface IErrorLogBatchService
 {
     Task<string> RunAsync(DateOnly date, CancellationToken cancellationToken = default);
     Task<string> RunMonthAsync(DateOnly month, CancellationToken cancellationToken = default);
 }
 
-public class RetryLogBatchService : IRetryLogBatchService
+public class ErrorLogBatchService : IErrorLogBatchService
 {
-    private static readonly Regex DailyRetryLogNamePattern = new(
-        @"RetryLog\d{8}\.csv",
+    private static readonly Regex DailyErrorLogNamePattern = new(
+        @"ErrorLog\d{8}\.(?:csv|xlsx|xls)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex MonthlyRetryLogNamePattern = new(
-        @"RetryLog\d{6}\*\*\.csv",
+    private static readonly Regex MonthlyErrorLogNamePattern = new(
+        @"ErrorLog\d{6}\*\*\.(?:csv|xlsx|xls)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex OutputRetryLogNamePattern = new(
-        @"TotalRetryLog(?:\d{8}|\d{6}\*\*|\d{6}|\d{2})\.csv",
+    private static readonly Regex OutputErrorLogNamePattern = new(
+        @"TotalErrorLog(?:\d{8}|\d{6}\*\*|\d{6}|\d{2})\.(?:csv|xlsx|xls)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex PauseCommandPattern = new(
         @"(?im)^\s*pause\s*$",
@@ -28,7 +28,7 @@ public class RetryLogBatchService : IRetryLogBatchService
 
     private readonly IConfiguration _configuration;
 
-    public RetryLogBatchService(IConfiguration configuration)
+    public ErrorLogBatchService(IConfiguration configuration)
     {
         _configuration = configuration;
     }
@@ -38,7 +38,7 @@ public class RetryLogBatchService : IRetryLogBatchService
         var dateText = date.ToString("yyyyMMdd");
         var outputFilePath = ResolveOutputFilePath("OutputFileTemplate", dateText, date.ToString("yyyyMM"), date.ToString("MM"));
 
-        return await RunInternalAsync($"RetryLog{dateText}.csv", outputFilePath, cancellationToken);
+        return await RunInternalAsync($"ErrorLog{dateText}.csv", outputFilePath, cancellationToken);
     }
 
     public async Task<string> RunMonthAsync(DateOnly month, CancellationToken cancellationToken = default)
@@ -46,19 +46,19 @@ public class RetryLogBatchService : IRetryLogBatchService
         var monthText = month.ToString("yyyyMM");
         var outputFilePath = ResolveOutputFilePath("MonthlyOutputFileTemplate", monthText, monthText, month.ToString("MM"));
 
-        return await RunInternalAsync($"RetryLog{monthText}**.csv", outputFilePath, cancellationToken);
+        return await RunInternalAsync($"ErrorLog{monthText}**.csv", outputFilePath, cancellationToken);
     }
 
     private string ResolveOutputFilePath(string templateKey, string dateText, string monthText, string monthNumber)
     {
-        var outputFileTemplate = _configuration[$"RetryLogBatch:{templateKey}"];
+        var outputFileTemplate = _configuration[$"ErrorLogBatch:{templateKey}"];
         outputFileTemplate = string.IsNullOrWhiteSpace(outputFileTemplate)
-            ? _configuration["RetryLogBatch:OutputFileTemplate"]
+            ? _configuration["ErrorLogBatch:OutputFileTemplate"]
             : outputFileTemplate;
 
         if (string.IsNullOrWhiteSpace(outputFileTemplate))
         {
-            throw new InvalidOperationException("Chưa cấu hình RetryLogBatch trong appsettings.json.");
+            throw new InvalidOperationException("Chưa cấu hình ErrorLogBatch trong appsettings.json.");
         }
 
         return outputFileTemplate
@@ -68,13 +68,13 @@ public class RetryLogBatchService : IRetryLogBatchService
             .Replace("{MM}", monthNumber, StringComparison.Ordinal);
     }
 
-    private async Task<string> RunInternalAsync(string retryLogFileName, string outputFilePath, CancellationToken cancellationToken)
+    private async Task<string> RunInternalAsync(string errorLogFileName, string outputFilePath, CancellationToken cancellationToken)
     {
-        var batchFilePath = _configuration["RetryLogBatch:BatchFilePath"];
+        var batchFilePath = _configuration["ErrorLogBatch:BatchFilePath"];
 
         if (string.IsNullOrWhiteSpace(batchFilePath))
         {
-            throw new InvalidOperationException("Chưa cấu hình RetryLogBatch trong appsettings.json.");
+            throw new InvalidOperationException("Chưa cấu hình ErrorLogBatch trong appsettings.json.");
         }
 
         await BatchLock.WaitAsync(cancellationToken);
@@ -82,13 +82,13 @@ public class RetryLogBatchService : IRetryLogBatchService
         {
             if (!File.Exists(batchFilePath))
             {
-                await CreateDefaultBatchFileAsync(batchFilePath, retryLogFileName, outputFilePath, cancellationToken);
+                await CreateDefaultBatchFileAsync(batchFilePath, errorLogFileName, outputFilePath, cancellationToken);
             }
 
             var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
-            var updatedBatchContent = DailyRetryLogNamePattern.Replace(batchContent, retryLogFileName);
-            updatedBatchContent = MonthlyRetryLogNamePattern.Replace(updatedBatchContent, retryLogFileName);
-            updatedBatchContent = OutputRetryLogNamePattern.Replace(
+            var updatedBatchContent = DailyErrorLogNamePattern.Replace(batchContent, errorLogFileName);
+            updatedBatchContent = MonthlyErrorLogNamePattern.Replace(updatedBatchContent, errorLogFileName);
+            updatedBatchContent = OutputErrorLogNamePattern.Replace(
                 updatedBatchContent,
                 Path.GetFileName(outputFilePath));
             updatedBatchContent = PauseCommandPattern.Replace(updatedBatchContent, string.Empty);
@@ -120,7 +120,7 @@ public class RetryLogBatchService : IRetryLogBatchService
             startInfo.ArgumentList.Add(batchFilePath);
 
             using var process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("Không thể chạy file batch tổng hợp retry log.");
+                ?? throw new InvalidOperationException("Không thể chạy file batch tổng hợp error log.");
             await process.WaitForExitAsync(cancellationToken);
 
             if (!File.Exists(outputFilePath))
@@ -143,7 +143,7 @@ public class RetryLogBatchService : IRetryLogBatchService
 
     private static async Task CreateDefaultBatchFileAsync(
         string batchFilePath,
-        string retryLogFileName,
+        string errorLogFileName,
         string outputFilePath,
         CancellationToken cancellationToken)
     {
@@ -157,7 +157,7 @@ public class RetryLogBatchService : IRetryLogBatchService
         var createOutputDirectoryCommand = string.IsNullOrWhiteSpace(outputDirectory)
             ? string.Empty
             : $"""if not exist "{outputDirectory}" mkdir "{outputDirectory}" """;
-        var sourcePattern = retryLogFileName.Replace("**", "*", StringComparison.Ordinal);
+        var sourcePattern = errorLogFileName.Replace("**", "*", StringComparison.Ordinal);
         var content = $"""
 @echo off
 setlocal

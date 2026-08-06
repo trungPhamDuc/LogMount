@@ -42,6 +42,9 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<IRetryLogParserService, RetryLogParserService>();
 builder.Services.AddScoped<IRetryLogImportService, RetryLogImportService>();
 builder.Services.AddSingleton<IRetryLogBatchService, RetryLogBatchService>();
+builder.Services.AddScoped<IErrorLogParserService, ErrorLogParserService>();
+builder.Services.AddScoped<IErrorLogImportService, ErrorLogImportService>();
+builder.Services.AddSingleton<IErrorLogBatchService, ErrorLogBatchService>();
 builder.Services.AddScoped<IPartListParserService, PartListParserService>();
 builder.Services.AddSingleton<ILogDataStore, MemoryLogDataStore>();
 builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();

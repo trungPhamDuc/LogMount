@@ -17,6 +17,11 @@
         var isDataByDatePage = currentPage.Equals("/DataByDate", StringComparison.OrdinalIgnoreCase);
         var isDataByMonthPage = currentPage.Equals("/DataByMonth", StringComparison.OrdinalIgnoreCase);
         var isRetryLogPage = isDashboardPage || isAnalysisPage || isDataByDatePage || isDataByMonthPage;
+        var isErrorLogDashboardPage = currentPage.Equals("/ErrorLogDashboard", StringComparison.OrdinalIgnoreCase);
+        var isErrorLogAnalysisPage = currentPage.Equals("/ErrorLogIndex", StringComparison.OrdinalIgnoreCase);
+        var isErrorLogDataByDatePage = currentPage.Equals("/ErrorLogDataByDate", StringComparison.OrdinalIgnoreCase);
+        var isErrorLogDataByMonthPage = currentPage.Equals("/ErrorLogDataByMonth", StringComparison.OrdinalIgnoreCase);
+        var isErrorLogPage = isErrorLogDashboardPage || isErrorLogAnalysisPage || isErrorLogDataByDatePage || isErrorLogDataByMonthPage;
     }
 
     <div class="app-shell">
@@ -41,6 +46,28 @@
                             <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
                         </a>
                         <a class="sidebar-link sidebar-sublink @(isDataByMonthPage ? "active" : "")" asp-area="" asp-page="/DataByMonth">
+                            <span class="sidebar-link-title">Xem dữ liệu theo tháng</span>
+                        </a>
+                    </div>
+                </details>
+                <details class="sidebar-group" @(isErrorLogPage ? "open" : "")>
+                    <summary class="sidebar-link sidebar-group-toggle @(isErrorLogPage ? "active" : "")">
+                        <span>
+                            <span class="sidebar-link-title">ErrorLog</span>
+                            <span class="sidebar-link-subtitle">Biểu đồ, phân tích và dữ liệu</span>
+                        </span>
+                    </summary>
+                    <div class="sidebar-subnav">
+                        <a class="sidebar-link sidebar-sublink @(isErrorLogDashboardPage ? "active" : "")" asp-area="" asp-page="/ErrorLogDashboard">
+                            <span class="sidebar-link-title">Xem biểu đồ</span>
+                        </a>
+                        <a class="sidebar-link sidebar-sublink @(isErrorLogAnalysisPage ? "active" : "")" asp-area="" asp-page="/ErrorLogIndex">
+                            <span class="sidebar-link-title">Phân tích ErrorLog</span>
+                        </a>
+                        <a class="sidebar-link sidebar-sublink @(isErrorLogDataByDatePage ? "active" : "")" asp-area="" asp-page="/ErrorLogDataByDate">
+                            <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
+                        </a>
+                        <a class="sidebar-link sidebar-sublink @(isErrorLogDataByMonthPage ? "active" : "")" asp-area="" asp-page="/ErrorLogDataByMonth">
                             <span class="sidebar-link-title">Xem dữ liệu theo tháng</span>
                         </a>
                     </div>

@@ -1,0 +1,75 @@
+@page "/ErrorLogAnalysis"
+@model ErrorLogIndexModel
+@{
+    ViewData["Title"] = "Phân tích ErrorLog";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <h1 class="h2 mb-1">Phân tích ErrorLog</h1>
+        <p class="text-muted mb-0">Tải lên hoặc tổng hợp ErrorLog từ batch; hệ thống tự lấy Line, Lane, Table và Error.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-body">
+            <h2 class="h5 card-title">Lấy ErrorLog theo ngày</h2>
+            <p class="text-muted small mb-3">Chọn ngày; hệ thống chạy batch tổng hợp ErrorLog và tự nạp file kết quả.</p>
+            <form method="post" asp-page-handler="LoadErrorLog" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label asp-for="ErrorLogDate" class="form-label">Ngày log</label>
+                    <input asp-for="ErrorLogDate" type="date" class="form-control" required />
+                </div>
+                <div class="col-md-8">
+                    <button type="submit" class="btn btn-success">Tổng hợp &amp; tải ErrorLog</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-body">
+            <h2 class="h5 card-title">Lấy ErrorLog theo tháng</h2>
+            <p class="text-muted small mb-3">Chọn tháng; hệ thống chạy batch tổng hợp và chỉ lưu các dòng mới chưa có trong CSDL.</p>
+            <form method="post" asp-page-handler="LoadErrorLogMonth" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label asp-for="ErrorLogMonth" class="form-label">Tháng log</label>
+                    <input asp-for="ErrorLogMonth" type="month" class="form-control" required />
+                </div>
+                <div class="col-md-8">
+                    <button type="submit" class="btn btn-success">Tổng hợp &amp; tải ErrorLog theo tháng</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Tải tệp ErrorLog</h2>
+            <form method="post" asp-page-handler="Upload" enctype="multipart/form-data" class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label asp-for="UploadFiles" class="form-label">Chọn một hoặc nhiều tệp (.csv, .xlsx, .xls)</label>
+                    <input asp-for="UploadFiles" type="file" class="form-control" accept=".csv,.xlsx,.xls" multiple />
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">Tải lên &amp; đọc ErrorLog</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

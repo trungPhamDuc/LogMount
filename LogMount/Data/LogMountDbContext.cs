@@ -11,6 +11,7 @@ public class LogMountDbContext : DbContext
     }
 
     public DbSet<RetryLogEntry> RetryLogEntries => Set<RetryLogEntry>();
+    public DbSet<ErrorLogEntry> ErrorLogEntries => Set<ErrorLogEntry>();
     public DbSet<ExpensivePart> ExpensiveParts => Set<ExpensivePart>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -56,6 +57,29 @@ public class LogMountDbContext : DbContext
             entity.Property(x => x.SourceFileName).HasMaxLength(255);
 
             entity.HasIndex(x => x.PartsName);
+            entity.HasIndex(x => x.UploadedAt);
+        });
+
+        modelBuilder.Entity<ErrorLogEntry>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Date).HasMaxLength(50);
+            entity.Property(x => x.EventDate).HasMaxLength(50);
+            entity.Property(x => x.Line).HasMaxLength(50);
+            entity.Property(x => x.Lane).HasMaxLength(50);
+            entity.Property(x => x.Table).HasMaxLength(50);
+            entity.Property(x => x.Error).HasMaxLength(255);
+            entity.Property(x => x.EventNo).HasMaxLength(50);
+            entity.Property(x => x.ProgramName).HasMaxLength(500);
+            entity.Property(x => x.Details).HasMaxLength(1000);
+            entity.Property(x => x.SourceFileName).HasMaxLength(255);
+            entity.Property(x => x.UploadBatchId).HasMaxLength(50);
+
+            entity.HasIndex(x => x.Date);
+            entity.HasIndex(x => new { x.Date, x.UploadedAt, x.Id })
+                .IsDescending(false, true, false);
+            entity.HasIndex(x => x.Error);
+            entity.HasIndex(x => x.Line);
             entity.HasIndex(x => x.UploadedAt);
         });
     }
