@@ -76,40 +76,6 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
-                            <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền ngày</h2>
-                            <div class="text-muted small">@Model.SelectedDate</div>
-                        </div>
-                        <span class="dashboard-total-badge">@Model.DailyExpensivePartCostTotal.ToString("N0") đồng</span>
-                    </div>
-                    <div class="dashboard-chart-grid">
-                        <div class="dashboard-doughnut-wrapper">
-                            <canvas id="expensivePartDayCostChart"></canvas>
-                        </div>
-                        <div class="dashboard-bar-wrapper">
-                            <canvas id="expensivePartDayCostBarChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="dashboard-summary-table-wrapper mt-3">
-                        <table class="table table-sm table-striped align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Parts Name</th>
-                                    <th class="text-end">Số tiền</th>
-                                    <th class="text-end">Tỷ lệ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="expensivePartDayCostTable"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-                        <div>
                             <h2 class="h5 card-title mb-1">Lỗi linh kiện đắt tiền ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
@@ -133,6 +99,40 @@
                                 </tr>
                             </thead>
                             <tbody id="expensivePartDayTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6">
+            <div class="card shadow-sm h-100 dashboard-chart-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền ngày</h2>
+                            <div class="text-muted small">@Model.SelectedDate</div>
+                        </div>
+                        <span class="dashboard-total-badge">@Model.DailyExpensivePartCostTotal.ToString("N0") đồng</span>
+                    </div>
+                    <div class="dashboard-chart-grid">
+                        <div class="dashboard-doughnut-wrapper">
+                            <canvas id="expensivePartDayCostChart"></canvas>
+                        </div>
+                        <div class="dashboard-bar-wrapper">
+                            <canvas id="expensivePartDayCostBarChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="dashboard-summary-table-wrapper mt-3">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parts Name</th>
+                                    <th class="text-end">Số tiền</th>
+                                    <th class="text-end">Tỷ lệ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensivePartDayCostTable"></tbody>
                         </table>
                     </div>
                 </div>

@@ -5,7 +5,7 @@ namespace LogMount.Services;
 
 public class RetryLogAutoImportService : BackgroundService
 {
-    private static readonly TimeSpan PreviousDayReimportTime = new(8, 45, 0);
+    private static readonly TimeSpan PreviousDayReimportTime = new(7, 30, 0);
     private static readonly string PreviousDayReimportStateFilePath = Path.Combine(
         Path.GetTempPath(),
         "LogMount",

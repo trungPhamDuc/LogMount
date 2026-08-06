@@ -68,6 +68,47 @@ body {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.sidebar-group {
+  display: block;
+}
+
+.sidebar-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sidebar-group-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-group-toggle::after {
+  content: ">";
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+  transition: transform 0.16s ease;
+}
+
+.sidebar-group:not([open]) .sidebar-group-toggle::after {
+  transform: rotate(-90deg);
+}
+
+.sidebar-subnav {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-left: 0.75rem;
+}
+
+.sidebar-sublink {
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.7rem;
+}
+
 .sidebar-link:hover,
 .sidebar-link.active {
   color: #fff;
