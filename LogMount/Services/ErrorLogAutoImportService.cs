@@ -1,0 +1,221 @@
+using LogMount.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace LogMount.Services;
+
+public class ErrorLogAutoImportService : BackgroundService
+{
+    private static readonly TimeSpan PreviousDayReimportTime = new(7, 30, 0);
+    private static readonly string PreviousDayReimportStateFilePath = Path.Combine(
+        Path.GetTempPath(),
+        "LogMount",
+        "previous-day-reimport-errorlog-state.txt");
+
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<ErrorLogAutoImportService> _logger;
+
+    public ErrorLogAutoImportService(
+        IServiceScopeFactory scopeFactory,
+        IConfiguration configuration,
+        ILogger<ErrorLogAutoImportService> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (!_configuration.GetValue("ErrorLogBatch:AutoImportEnabled", true))
+        {
+            return;
+        }
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var now = DateTime.Now;
+            await ReimportPreviousDayIfDueAsync(now, stoppingToken);
+
+            now = DateTime.Now;
+            var nextRunTime = GetNextRunTime(now, GetLastPreviousDayReimportDate(DateOnly.FromDateTime(now)));
+            var delay = nextRunTime - now;
+            var shouldImportToday = IsHourlyRun(nextRunTime);
+
+            _logger.LogInformation(
+                "Next auto import error log will run at {NextRunTime}.",
+                nextRunTime);
+
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, stoppingToken);
+            }
+
+            if (shouldImportToday)
+            {
+                await ImportTodayAsync(stoppingToken);
+            }
+
+            await ReimportPreviousDayIfDueAsync(DateTime.Now, stoppingToken);
+        }
+    }
+
+    private static DateTime GetNextRunTime(DateTime now, DateOnly? lastPreviousDayReimportDate)
+    {
+        var nextHourlyRun = GetNextHourlyRunTime(now);
+        var today = DateOnly.FromDateTime(now);
+        var todayReimportRun = now.Date.Add(PreviousDayReimportTime);
+        var nextReimportRun = lastPreviousDayReimportDate == today || todayReimportRun <= now
+            ? todayReimportRun.AddDays(1)
+            : todayReimportRun;
+
+        return nextHourlyRun <= nextReimportRun
+            ? nextHourlyRun
+            : nextReimportRun;
+    }
+
+    private static DateTime GetNextHourlyRunTime(DateTime now)
+    {
+        var currentSlot = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
+        var nextRun = now.Minute == 0 && now.Second == 0
+            ? currentSlot
+            : currentSlot.AddHours(1);
+
+        if (nextRun <= now)
+        {
+            nextRun = nextRun.AddHours(1);
+        }
+
+        return nextRun;
+    }
+
+    private static bool IsHourlyRun(DateTime runTime)
+    {
+        return runTime.Minute == 0 && runTime.Second == 0;
+    }
+
+    private async Task ImportTodayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var batchService = scope.ServiceProvider.GetRequiredService<IErrorLogBatchService>();
+            var parserService = scope.ServiceProvider.GetRequiredService<IErrorLogParserService>();
+            var importService = scope.ServiceProvider.GetRequiredService<IErrorLogImportService>();
+
+            var date = DateOnly.FromDateTime(DateTime.Today);
+            var outputFilePath = await batchService.RunAsync(date, cancellationToken);
+            await using var stream = File.OpenRead(outputFilePath);
+            var fileName = Path.GetFileName(outputFilePath);
+            var entries = await parserService.ParseAsync(stream, fileName, cancellationToken);
+
+            var savedCount = await importService.ReplaceEntriesFromFileAsync(
+                entries,
+                fileName,
+                Guid.NewGuid().ToString("N"),
+                DateTime.Now,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Auto imported error log for {Date}. Parsed {ParsedCount} rows, replaced {SavedCount} rows.",
+                date,
+                entries.Count,
+                savedCount);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Auto import error log failed.");
+        }
+    }
+
+    private async Task ReimportPreviousDayIfDueAsync(DateTime now, CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(now);
+        if (now.TimeOfDay < PreviousDayReimportTime ||
+            GetLastPreviousDayReimportDate(today) == today)
+        {
+            return;
+        }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LogMountDbContext>();
+            var batchService = scope.ServiceProvider.GetRequiredService<IErrorLogBatchService>();
+            var parserService = scope.ServiceProvider.GetRequiredService<IErrorLogParserService>();
+            var importService = scope.ServiceProvider.GetRequiredService<IErrorLogImportService>();
+
+            var previousDate = today.AddDays(-1);
+            var previousDateText = previousDate.ToString("yyyy/MM/dd");
+
+            var deletedCount = await dbContext.ErrorLogEntries
+                .Where(entry => entry.Date == previousDateText)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            var outputFilePath = await batchService.RunAsync(previousDate, cancellationToken);
+            await using var stream = File.OpenRead(outputFilePath);
+            var fileName = Path.GetFileName(outputFilePath);
+            var entries = await parserService.ParseAsync(stream, fileName, cancellationToken);
+
+            var savedCount = await importService.SaveNewEntriesAsync(
+                entries,
+                fileName,
+                Guid.NewGuid().ToString("N"),
+                DateTime.Now,
+                cancellationToken);
+
+            SaveLastPreviousDayReimportDate(today);
+
+            _logger.LogInformation(
+                "Reimported previous day error log for {Date}. Deleted {DeletedCount} rows, parsed {ParsedCount} rows, saved {SavedCount} rows.",
+                previousDate,
+                deletedCount,
+                entries.Count,
+                savedCount);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Previous day error log reimport failed.");
+        }
+    }
+
+    private static DateOnly? GetLastPreviousDayReimportDate(DateOnly today)
+    {
+        if (!File.Exists(PreviousDayReimportStateFilePath))
+        {
+            return null;
+        }
+
+        var stateText = File.ReadAllText(PreviousDayReimportStateFilePath).Trim();
+        if (!DateOnly.TryParseExact(stateText, "yyyy-MM-dd", out var stateDate))
+        {
+            File.Delete(PreviousDayReimportStateFilePath);
+            return null;
+        }
+
+        if (stateDate == today)
+        {
+            return stateDate;
+        }
+
+        File.Delete(PreviousDayReimportStateFilePath);
+        return null;
+    }
+
+    private static void SaveLastPreviousDayReimportDate(DateOnly date)
+    {
+        var stateDirectory = Path.GetDirectoryName(PreviousDayReimportStateFilePath);
+        if (!string.IsNullOrWhiteSpace(stateDirectory))
+        {
+            Directory.CreateDirectory(stateDirectory);
+        }
+
+        File.WriteAllText(PreviousDayReimportStateFilePath, date.ToString("yyyy-MM-dd"));
+    }
+}

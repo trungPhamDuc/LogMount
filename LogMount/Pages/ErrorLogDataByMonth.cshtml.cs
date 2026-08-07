@@ -92,12 +92,20 @@ public class ErrorLogDataByMonthModel : PageModel
             return RedirectToPage();
         }
 
-        var deletedCount = await _dbContext.ErrorLogEntries
-            .Where(x => x.Date != null && x.Date.StartsWith(SelectedMonth))
-            .ExecuteDeleteAsync(cancellationToken);
+        _dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+        var totalDeleted = 0;
+        int batchDeleted;
+        do
+        {
+            batchDeleted = await _dbContext.ErrorLogEntries
+                .Where(x => x.Date != null && x.Date.StartsWith(SelectedMonth))
+                .Take(5000)
+                .ExecuteDeleteAsync(cancellationToken);
+            totalDeleted += batchDeleted;
+        } while (batchDeleted > 0);
 
-        SuccessMessage = deletedCount > 0
-            ? $"Đã xóa dữ liệu ErrorLog tháng {SelectedMonth} khỏi CSDL."
+        SuccessMessage = totalDeleted > 0
+            ? $"Đã xóa {totalDeleted:N0} dòng dữ liệu ErrorLog tháng {SelectedMonth} khỏi CSDL."
             : $"Không tìm thấy dữ liệu ErrorLog tháng {SelectedMonth} trong CSDL.";
 
         return RedirectToPage(new { SearchMonth });
@@ -148,6 +156,8 @@ public class ErrorLogDataByMonthModel : PageModel
             ["Filter.Table"] = Filter.Table
         };
     }
+
+    public static string GetErrorNameCssClass(string? errorName) => ErrorLogHelper.GetErrorNameCssClass(errorName);
 
     public Dictionary<string, string?> GetExportRouteValues(string section, string format)
     {

@@ -125,6 +125,13 @@ public class ErrorLogImportService : IErrorLogImportService
 
     private static bool IsValidEntry(ErrorLogEntry entry)
     {
+        if (string.Equals(entry.EventDate, "Event Date", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(entry.ProgramName, "Program Name", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(entry.Error, "Contents", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         return !string.IsNullOrWhiteSpace(entry.EventDate) &&
                !string.IsNullOrWhiteSpace(entry.Error);
     }

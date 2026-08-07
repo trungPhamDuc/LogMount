@@ -145,6 +145,47 @@
                 return url.pathname + url.search;
             }
 
+            var centerTextPlugin = {
+                id: 'centerText',
+                afterDraw: function (chart) {
+                    if (chart.config.type !== 'doughnut') {
+                        return;
+                    }
+                    var options = chart.options.plugins.centerText || {};
+                    var total = options.total || 0;
+                    var unit = options.unit || 'lỗi';
+                    var ctx = chart.ctx;
+                    var area = chart.chartArea;
+                    var x = (area.left + area.right) / 2;
+                    var y = (area.top + area.bottom) / 2;
+
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#111827';
+                    ctx.font = '700 22px sans-serif';
+                    ctx.fillText(formatValue(total), x, y - 8);
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '600 11px sans-serif';
+                    ctx.fillText(unit, x, y + 18);
+                    ctx.restore();
+                }
+            };
+            Chart.register(centerTextPlugin);
+
+            function getErrorCssClass(errorName) {
+                if (!errorName) return 'error-name-tag error-name-empty';
+                var upper = String(errorName).trim().toUpperCase();
+                if (upper.indexOf('PICK UP') !== -1 || upper.indexOf('PICKUP') !== -1) return 'error-name-tag error-name-pickup';
+                if (upper.indexOf('VACUUM') !== -1 || upper.indexOf('VACCUM') !== -1) return 'error-name-tag error-name-vacuum';
+                if (upper.indexOf('AUTORUN') !== -1 || upper.indexOf('AUTO RUN') !== -1) return 'error-name-tag error-name-autorun';
+                if (upper.indexOf('PARTS') !== -1) return 'error-name-tag error-name-parts';
+                if (upper.indexOf('VISION') !== -1 || upper.indexOf('CAMERA') !== -1 || upper.indexOf('SIDE VIEW') !== -1) return 'error-name-tag error-name-vision';
+                if (upper.indexOf('LEAD') !== -1 || upper.indexOf('WIDTH') !== -1) return 'error-name-tag error-name-lead';
+                if (upper.indexOf('INTERLOCK') !== -1 || upper.indexOf('NON-SAVED') !== -1 || upper.indexOf('RESET') !== -1) return 'error-name-tag error-name-interlock';
+                return 'error-name-tag error-name-default';
+            }
+
             function renderDoughnut(canvasId, data) {
                 var canvas = document.getElementById(canvasId);
                 if (!canvas) {
@@ -165,7 +206,8 @@
                             data: data.map(function (item) { return item.value; }),
                             backgroundColor: data.map(function (_, index) { return palette[index] || palette[palette.length - 1]; }),
                             borderColor: '#fff',
-                            borderWidth: 2
+                            borderWidth: 2,
+                            hoverOffset: 8
                         }]
                     },
                     options: {
@@ -173,6 +215,10 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
+                            centerText: {
+                                total: total,
+                                unit: 'lỗi'
+                            },
                             legend: { display: false },
                             tooltip: {
                                 callbacks: {
@@ -230,8 +276,9 @@
                 tableBody.innerHTML = data.map(function (item) {
                     var labelText = getLabel(item);
                     var href = linkBuilder(labelText);
+                    var badgeClass = getErrorCssClass(labelText);
                     return '<tr>' +
-                        '<td class="text-truncate" title="' + escapeHtml(labelText) + '"><a class="dashboard-table-link" href="' + escapeHtml(href) + '">' + escapeHtml(labelText) + '</a></td>' +
+                        '<td class="text-truncate error-name-cell" title="' + escapeHtml(labelText) + '"><a class="dashboard-table-link" href="' + escapeHtml(href) + '"><span class="' + badgeClass + '">' + escapeHtml(labelText) + '</span></a></td>' +
                         '<td class="text-end fw-semibold">' + formatValue(item.value) + '</td>' +
                         '<td class="text-end text-danger fw-semibold">' + getPercent(item.value, total) + '%</td>' +
                     '</tr>';

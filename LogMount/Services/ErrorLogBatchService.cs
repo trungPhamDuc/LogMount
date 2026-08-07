@@ -13,13 +13,13 @@ public interface IErrorLogBatchService
 public class ErrorLogBatchService : IErrorLogBatchService
 {
     private static readonly Regex DailyErrorLogNamePattern = new(
-        @"ErrorLog\d{8}\.(?:csv|xlsx|xls)",
+        @"(?:ErrorLog|ErrLog)\d{8}\.(?:csv|xlsx|xls)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex MonthlyErrorLogNamePattern = new(
-        @"ErrorLog\d{6}\*\*\.(?:csv|xlsx|xls)",
+        @"(?:ErrorLog|ErrLog)\d{6}\*\*\.(?:csv|xlsx|xls)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex OutputErrorLogNamePattern = new(
-        @"TotalErrorLog(?:\d{8}|\d{6}\*\*|\d{6}|\d{2})\.(?:csv|xlsx|xls)",
+        @"(?:TotalErrorLog|TotalErrLog)(?:\d{8}|\d{6}\*\*|\d{6}|\d{2})\.(?:csv|xlsx|xls)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex PauseCommandPattern = new(
         @"(?im)^\s*pause\s*$",
@@ -38,7 +38,7 @@ public class ErrorLogBatchService : IErrorLogBatchService
         var dateText = date.ToString("yyyyMMdd");
         var outputFilePath = ResolveOutputFilePath("OutputFileTemplate", dateText, date.ToString("yyyyMM"), date.ToString("MM"));
 
-        return await RunInternalAsync($"ErrorLog{dateText}.csv", outputFilePath, cancellationToken);
+        return await RunInternalAsync($"ErrLog{dateText}.csv", outputFilePath, cancellationToken);
     }
 
     public async Task<string> RunMonthAsync(DateOnly month, CancellationToken cancellationToken = default)
@@ -46,7 +46,7 @@ public class ErrorLogBatchService : IErrorLogBatchService
         var monthText = month.ToString("yyyyMM");
         var outputFilePath = ResolveOutputFilePath("MonthlyOutputFileTemplate", monthText, monthText, month.ToString("MM"));
 
-        return await RunInternalAsync($"ErrorLog{monthText}**.csv", outputFilePath, cancellationToken);
+        return await RunInternalAsync($"ErrLog{monthText}**.csv", outputFilePath, cancellationToken);
     }
 
     private string ResolveOutputFilePath(string templateKey, string dateText, string monthText, string monthNumber)
@@ -80,7 +80,7 @@ public class ErrorLogBatchService : IErrorLogBatchService
         await BatchLock.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(batchFilePath))
+            if (!File.Exists(batchFilePath) || await IsGeneratedSingleSourceBatchAsync(batchFilePath, cancellationToken))
             {
                 await CreateDefaultBatchFileAsync(batchFilePath, errorLogFileName, outputFilePath, cancellationToken);
             }
@@ -141,7 +141,7 @@ public class ErrorLogBatchService : IErrorLogBatchService
         }
     }
 
-    private static async Task CreateDefaultBatchFileAsync(
+    private async Task CreateDefaultBatchFileAsync(
         string batchFilePath,
         string errorLogFileName,
         string outputFilePath,
@@ -153,12 +153,40 @@ public class ErrorLogBatchService : IErrorLogBatchService
             Directory.CreateDirectory(batchDirectory);
         }
 
+        var retryLogBatchFilePath = _configuration["RetryLogBatch:BatchFilePath"];
+        var content = !string.IsNullOrWhiteSpace(retryLogBatchFilePath) && File.Exists(retryLogBatchFilePath)
+            ? await CreateBatchFromRetryLogTemplateAsync(retryLogBatchFilePath, cancellationToken)
+            : CreateMinimalBatchContent(errorLogFileName, outputFilePath);
+
+        await File.WriteAllTextAsync(batchFilePath, content, new UTF8Encoding(false), cancellationToken);
+    }
+
+    private static async Task<bool> IsGeneratedSingleSourceBatchAsync(string batchFilePath, CancellationToken cancellationToken)
+    {
+        var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
+        return batchContent.Contains(@"set ""SOURCE=%~dp0", StringComparison.OrdinalIgnoreCase) &&
+               batchContent.Contains(@"copy /b ""%SOURCE%"" ""%OUTPUT%""", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task<string> CreateBatchFromRetryLogTemplateAsync(
+        string retryLogBatchFilePath,
+        CancellationToken cancellationToken)
+    {
+        var retryLogBatchContent = await File.ReadAllTextAsync(retryLogBatchFilePath, cancellationToken);
+        return retryLogBatchContent
+            .Replace("Total RetryLog", "Total ErrorLog", StringComparison.OrdinalIgnoreCase)
+            .Replace("TotalRetryLog", "TotalErrorLog", StringComparison.OrdinalIgnoreCase)
+            .Replace("RetryLog", "ErrorLog", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateMinimalBatchContent(string errorLogFileName, string outputFilePath)
+    {
         var outputDirectory = Path.GetDirectoryName(outputFilePath);
         var createOutputDirectoryCommand = string.IsNullOrWhiteSpace(outputDirectory)
             ? string.Empty
             : $"""if not exist "{outputDirectory}" mkdir "{outputDirectory}" """;
         var sourcePattern = errorLogFileName.Replace("**", "*", StringComparison.Ordinal);
-        var content = $"""
+        return $"""
 @echo off
 setlocal
 set "SOURCE=%~dp0{sourcePattern}"
@@ -167,7 +195,5 @@ set "OUTPUT={outputFilePath}"
 copy /b "%SOURCE%" "%OUTPUT%" /y
 endlocal
 """;
-
-        await File.WriteAllTextAsync(batchFilePath, content, new UTF8Encoding(false), cancellationToken);
     }
 }

@@ -50,6 +50,7 @@ builder.Services.AddSingleton<ILogDataStore, MemoryLogDataStore>();
 builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();
 builder.Services.AddSingleton<ILogExportService, LogExportService>();
 builder.Services.AddHostedService<RetryLogAutoImportService>();
+builder.Services.AddHostedService<ErrorLogAutoImportService>();
 
 var app = builder.Build();
 

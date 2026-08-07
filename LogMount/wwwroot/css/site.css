@@ -209,8 +209,50 @@ body {
   border-color: #c4b5fd;
 }
 
+.error-name-vacuum {
+  color: #1e40af;
+  background-color: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.error-name-autorun {
+  color: #166534;
+  background-color: #dcfce7;
+  border-color: #86efac;
+}
+
+.error-name-interlock {
+  color: #9f1239;
+  background-color: #ffe4e6;
+  border-color: #fda4af;
+}
+
+.error-name-nozzle {
+  color: #c2410c;
+  background-color: #ffedd5;
+  border-color: #fdba74;
+}
+
+.error-name-maintenance {
+  color: #047857;
+  background-color: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.error-name-pallet {
+  color: #4338ca;
+  background-color: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+.error-name-control {
+  color: #0f766e;
+  background-color: #ccfbf1;
+  border-color: #5eead4;
+}
+
 .error-name-default {
-  color: #1f2937;
+  color: #374151;
   background-color: #f3f4f6;
   border-color: #d1d5db;
 }
@@ -220,11 +262,6 @@ body {
   background-color: #f9fafb;
   border-color: #e5e7eb;
 }
-
-.export-actions .btn {
-  min-width: 72px;
-}
-
 .upload-file-list .list-group-item {
   background: transparent;
 }

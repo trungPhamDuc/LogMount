@@ -133,14 +133,14 @@
                     <table class="table table-sm table-striped table-hover align-middle mb-0">
                         <thead class="table-dark">
                             <tr>
-                                <th>Error</th><th>Event No.</th><th>Line</th><th>Lane</th><th>Table</th><th class="text-end">Số lần</th>
+                                <th>Error</th><th>Event No.</th><th class="text-end">Số lần</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var item in Model.Summary)
                             {
                                 <tr>
-                                    <td class="fw-semibold">@item.Error</td><td>@item.EventNo</td><td>@item.Lines</td><td>@item.Lanes</td><td>@item.Tables</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                    <td class="error-name-cell"><span class="@ErrorLogHelper.GetErrorNameCssClass(item.Error)">@item.Error</span></td><td>@item.EventNo</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
                                 </tr>
                             }
                         </tbody>
@@ -170,7 +170,9 @@
                             @foreach (var row in Model.Entries)
                             {
                                 <tr>
-                                    <td>@row.EventDate</td><td>@row.Line</td><td>@row.Lane</td><td>@row.Table</td><td>@row.Error</td><td>@row.EventNo</td><td>@row.ProgramName</td><td>@row.Details</td>
+                                    <td>@row.EventDate</td><td>@row.Line</td><td>@row.Lane</td><td>@row.Table</td>
+                                    <td class="error-name-cell"><span class="@ErrorLogHelper.GetErrorNameCssClass(row.Error)">@row.Error</span></td>
+                                    <td>@row.EventNo</td><td>@row.ProgramName</td><td>@row.Details</td>
                                 </tr>
                             }
                         </tbody>

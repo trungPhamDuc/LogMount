@@ -99,6 +99,11 @@ public class DataByMonthModel : PageModel
         TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
         PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
 
+
+        TotalRecords = await query.CountAsync(cancellationToken);
+        TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
+        PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
+
         Entries = await query
             .OrderBy(x => x.Date)
             .ThenBy(x => x.OccurrenceTime)
@@ -122,12 +127,20 @@ public class DataByMonthModel : PageModel
             return RedirectToPage("./DataByMonth");
         }
 
-        var deletedCount = await _dbContext.RetryLogEntries
-            .Where(x => x.Date != null && x.Date.StartsWith(SelectedMonth))
-            .ExecuteDeleteAsync(cancellationToken);
+        _dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+        var totalDeleted = 0;
+        int batchDeleted;
+        do
+        {
+            batchDeleted = await _dbContext.RetryLogEntries
+                .Where(x => x.Date != null && x.Date.StartsWith(SelectedMonth))
+                .Take(5000)
+                .ExecuteDeleteAsync(cancellationToken);
+            totalDeleted += batchDeleted;
+        } while (batchDeleted > 0);
 
-        SuccessMessage = deletedCount > 0
-            ? $"Đã xóa dữ liệu retryLog tháng {SelectedMonth} khỏi CSDL."
+        SuccessMessage = totalDeleted > 0
+            ? $"Đã xóa {totalDeleted:N0} dòng dữ liệu retryLog tháng {SelectedMonth} khỏi CSDL."
             : $"Không tìm thấy dữ liệu retryLog tháng {SelectedMonth} trong CSDL.";
 
         return RedirectToPage("./DataByMonth", new
@@ -201,7 +214,6 @@ public class DataByMonthModel : PageModel
 
         return File(exportResult.Content, exportResult.ContentType, exportResult.FileName);
     }
-
     public Dictionary<string, string?> GetRouteValues(int pageNumber)
     {
         return new Dictionary<string, string?>

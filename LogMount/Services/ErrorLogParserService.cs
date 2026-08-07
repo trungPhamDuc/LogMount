@@ -14,7 +14,7 @@ public interface IErrorLogParserService
 public class ErrorLogParserService : IErrorLogParserService
 {
     private static readonly Regex LinePattern = new(@"_L(?<line>\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex LanePattern = new(@"/Lane(?<lane>\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex LanePattern = new(@"[/_]Lane\s*(?<lane>\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex TablePattern = new(@"/Table(?<table>[A-Z])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     static ErrorLogParserService()
@@ -62,7 +62,13 @@ public class ErrorLogParserService : IErrorLogParserService
                 continue;
             }
 
-            var entry = MapRow(SplitCsvLine(lines[i]), columnMap);
+            var rowValues = SplitCsvLine(lines[i]);
+            if (IsHeaderRow(rowValues))
+            {
+                continue;
+            }
+
+            var entry = MapRow(rowValues, columnMap);
             if (IsValidEntry(entry))
             {
                 entries.Add(entry);
@@ -94,6 +100,11 @@ public class ErrorLogParserService : IErrorLogParserService
                 }
 
                 columnMap = BuildColumnMap(values);
+                continue;
+            }
+
+            if (IsHeaderRow(values))
+            {
                 continue;
             }
 
@@ -152,7 +163,7 @@ public class ErrorLogParserService : IErrorLogParserService
         var programName = GetValue("Program Name");
         var details = GetValue("Details");
         var table = ExtractTable(details);
-        var lane = ExtractLane(details) ?? InferLaneFromTable(table);
+        var lane = ExtractLane(details) ?? ExtractLane(programName) ?? InferLaneFromTable(table);
 
         return new ErrorLogEntry
         {
@@ -162,7 +173,7 @@ public class ErrorLogParserService : IErrorLogParserService
             Lane = lane,
             Table = table,
             Error = GetValue("Contents"),
-            EventNo = GetValue("Event No.") ?? GetValue("Event No") ?? GetValue("Event Nur"),
+            EventNo = GetValue("Event No.") ?? GetValue("Event No") ?? GetValue("Event Nur") ?? GetValue("Event Number"),
             ProgramName = programName,
             Details = details
         };
@@ -177,6 +188,13 @@ public class ErrorLogParserService : IErrorLogParserService
 
     private static bool IsValidEntry(ErrorLogEntry entry)
     {
+        if (string.Equals(entry.EventDate, "Event Date", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(entry.ProgramName, "Program Name", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(entry.Error, "Contents", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         return !string.IsNullOrWhiteSpace(entry.EventDate) &&
                !string.IsNullOrWhiteSpace(entry.ProgramName) &&
                !string.IsNullOrWhiteSpace(entry.Error);

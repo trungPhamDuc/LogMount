@@ -143,12 +143,20 @@ public class DataByDateModel : PageModel
             return RedirectToPage("./DataByDate");
         }
 
-        var deletedCount = await _dbContext.RetryLogEntries
-            .Where(x => x.Date == SelectedDate)
-            .ExecuteDeleteAsync(cancellationToken);
+        _dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+        var totalDeleted = 0;
+        int batchDeleted;
+        do
+        {
+            batchDeleted = await _dbContext.RetryLogEntries
+                .Where(x => x.Date == SelectedDate)
+                .Take(5000)
+                .ExecuteDeleteAsync(cancellationToken);
+            totalDeleted += batchDeleted;
+        } while (batchDeleted > 0);
 
-        SuccessMessage = deletedCount > 0
-            ? $"Đã xóa dữ liệu retryLog ngày {SelectedDate} khỏi CSDL."
+        SuccessMessage = totalDeleted > 0
+            ? $"Đã xóa {totalDeleted:N0} dòng dữ liệu retryLog ngày {SelectedDate} khỏi CSDL."
             : $"Không tìm thấy dữ liệu retryLog ngày {SelectedDate} trong CSDL.";
 
         return RedirectToPage("./DataByDate", new
