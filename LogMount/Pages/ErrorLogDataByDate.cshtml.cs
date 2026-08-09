@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LogMount.Data;
 using LogMount.Models;
 using LogMount.Services;
@@ -10,6 +11,11 @@ namespace LogMount.Pages;
 public class ErrorLogDataByDateModel : PageModel
 {
     private const int PageSize = 100;
+    private static readonly int[] TopNOptions = [10, 20, 30];
+    private static readonly JsonSerializerOptions ChartJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     private readonly LogMountDbContext _dbContext;
     private readonly ILogExportService _exportService;
@@ -32,6 +38,9 @@ public class ErrorLogDataByDateModel : PageModel
     [BindProperty(SupportsGet = true)]
     public ErrorLogFilterCriteria Filter { get; set; } = new();
 
+    [BindProperty(SupportsGet = true)]
+    public int TopN { get; set; } = 10;
+
     [TempData]
     public string? SuccessMessage { get; set; }
 
@@ -42,8 +51,14 @@ public class ErrorLogDataByDateModel : PageModel
     public IReadOnlyList<string> DisplayDates { get; set; } = [];
     public IReadOnlyList<ErrorLogEntry> Entries { get; set; } = [];
     public IReadOnlyList<ErrorLogSummaryItem> Summary { get; set; } = [];
+    public IReadOnlyList<ErrorLogDetailSummaryItem> DetailSummary { get; set; } = [];
+    public IReadOnlyList<ErrorLogTopItem> TopErrors { get; set; } = [];
+    public IReadOnlyList<int> TopNChoices { get; } = TopNOptions;
     public int TotalRecords { get; set; }
     public int TotalPages { get; set; }
+    public int TotalErrorCount { get; set; }
+    public int FilteredErrorCount { get; set; }
+    public string ChartDataJson { get; set; } = "[]";
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -73,6 +88,8 @@ public class ErrorLogDataByDateModel : PageModel
             return;
         }
 
+        TopN = TopNOptions.Contains(TopN) ? TopN : 10;
+
         var query = ApplyFilter(_dbContext.ErrorLogEntries.AsNoTracking()
             .Where(x => x.Date == SelectedDate), Filter);
 
@@ -89,6 +106,19 @@ public class ErrorLogDataByDateModel : PageModel
             .Skip((PageNumber - 1) * PageSize)
             .Take(PageSize)
             .ToList();
+
+        var detailSummary = ErrorLogAnalysisService.SummarizeByLocation(allRows);
+        TotalErrorCount = detailSummary.Sum(x => x.Count);
+        DetailSummary = ErrorLogAnalysisService.SortDetailSummary(
+            ErrorLogAnalysisService.FilterDetailSummary(detailSummary, Filter),
+            Filter);
+        FilteredErrorCount = DetailSummary.Sum(x => x.Count);
+        TopErrors = ErrorLogAnalysisService.GetTopErrors(DetailSummary, TopN);
+        ChartDataJson = JsonSerializer.Serialize(TopErrors.Select(x => new
+        {
+            x.Error,
+            x.TotalCount
+        }), ChartJsonOptions);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(CancellationToken cancellationToken)
@@ -144,9 +174,19 @@ public class ErrorLogDataByDateModel : PageModel
         }
 
         var baseFileName = $"errorlog-ngay-{SelectedDate.Replace('/', '-')}";
-        var exportResult = section?.Trim().ToLowerInvariant() == "summary"
-            ? _exportService.ExportErrorLogSummary(ErrorLogAnalysisService.SummarizeErrors(rows), exportFormat, baseFileName)
-            : _exportService.ExportErrorLogs(rows, exportFormat, baseFileName);
+        var exportResult = section?.Trim().ToLowerInvariant() switch
+        {
+            "summary" => _exportService.ExportErrorLogSummary(ErrorLogAnalysisService.SummarizeErrors(rows), exportFormat, baseFileName),
+            "detailsummary" => _exportService.ExportErrorLogDetailSummary(
+                ErrorLogAnalysisService.SortDetailSummary(
+                    ErrorLogAnalysisService.FilterDetailSummary(
+                        ErrorLogAnalysisService.SummarizeByLocation(rows),
+                        Filter),
+                    Filter),
+                exportFormat,
+                baseFileName),
+            _ => _exportService.ExportErrorLogs(rows, exportFormat, baseFileName)
+        };
 
         return File(exportResult.Content, exportResult.ContentType, exportResult.FileName);
     }
@@ -161,7 +201,11 @@ public class ErrorLogDataByDateModel : PageModel
             ["Filter.Error"] = Filter.Error,
             ["Filter.Line"] = Filter.Line,
             ["Filter.Lane"] = Filter.Lane,
-            ["Filter.Table"] = Filter.Table
+            ["Filter.Table"] = Filter.Table,
+            ["Filter.Side"] = Filter.Side,
+            ["Filter.Machine"] = Filter.Machine,
+            ["Filter.SortDirection"] = Filter.SortDirection,
+            ["TopN"] = TopN.ToString()
         };
     }
 

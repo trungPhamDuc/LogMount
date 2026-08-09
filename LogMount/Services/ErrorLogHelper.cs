@@ -1,7 +1,50 @@
+using System.Text.RegularExpressions;
+
 namespace LogMount.Services;
 
 public static class ErrorLogHelper
 {
+    private static readonly Regex LineNumPattern = new(@"_L(?<line>\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex LineWordPattern = new(@"LINE\s*(?<line>\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    public static string? GetEffectiveLine(string? line, string? programName)
+    {
+        if (!string.IsNullOrWhiteSpace(line))
+        {
+            return line;
+        }
+
+        if (string.IsNullOrWhiteSpace(programName))
+        {
+            return null;
+        }
+
+        var match = LineNumPattern.Match(programName);
+        if (match.Success)
+        {
+            return $"Line {match.Groups["line"].Value}";
+        }
+
+        if (programName.Contains("LTE", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Line LTE";
+        }
+
+        var lineWordMatch = LineWordPattern.Match(programName);
+        if (lineWordMatch.Success)
+        {
+            return $"Line {lineWordMatch.Groups["line"].Value}";
+        }
+
+        return null;
+    }
+
+    public static string ParseSide(string? programName) => LotNameParser.ParseSide(programName);
+
+    public static string ParseMachine(string? programName) => LotNameParser.ParseMachine(programName);
+
+    public static string GetSideLabel(string? side) => LotNameParser.GetSideLabel(side);
+
     public static string GetErrorNameCssClass(string? errorName)
     {
         if (string.IsNullOrWhiteSpace(errorName))

@@ -202,13 +202,7 @@ public class ErrorLogParserService : IErrorLogParserService
 
     private static string? ExtractLine(string? programName)
     {
-        if (string.IsNullOrWhiteSpace(programName))
-        {
-            return null;
-        }
-
-        var match = LinePattern.Match(programName);
-        return match.Success ? $"Line {match.Groups["line"].Value}" : null;
+        return ErrorLogHelper.GetEffectiveLine(null, programName);
     }
 
     private static string? ExtractLane(string? details)

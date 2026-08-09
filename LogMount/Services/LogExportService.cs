@@ -14,6 +14,7 @@ public interface ILogExportService
     FileExportResult ExportLogs(IReadOnlyList<RetryLogEntry> items, ExportFormat format, string baseFileName);
     FileExportResult ExportErrorLogs(IReadOnlyList<ErrorLogEntry> items, ExportFormat format, string baseFileName);
     FileExportResult ExportErrorLogSummary(IReadOnlyList<ErrorLogSummaryItem> items, ExportFormat format, string baseFileName);
+    FileExportResult ExportErrorLogDetailSummary(IReadOnlyList<ErrorLogDetailSummaryItem> items, ExportFormat format, string baseFileName);
     FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName);
 }
 
@@ -36,12 +37,17 @@ public class LogExportService : ILogExportService
 
     private static readonly string[] ErrorLogHeaders =
     [
-        "Event Date", "Line", "Lane", "Table", "Error", "Event No.", "Program Name", "Details"
+        "Event Date", "Line", "Lane", "Mặt", "Máy", "Table", "Error", "Event No.", "Program Name", "Details"
     ];
 
     private static readonly string[] ErrorLogSummaryHeaders =
     [
         "Error", "Event No.", "Số lần", "Date", "Line", "Lane", "Table"
+    ];
+
+    private static readonly string[] ErrorLogDetailSummaryHeaders =
+    [
+        "Error", "Line", "Lane", "Mặt", "Máy", "Table", "Event No.", "Số lần"
     ];
 
     private static readonly string[] ExpensivePartHeaders =
@@ -110,8 +116,10 @@ public class LogExportService : ILogExportService
         var rows = items.Select(item => new string[]
         {
             item.EventDate ?? string.Empty,
-            item.Line ?? string.Empty,
+            ErrorLogHelper.GetEffectiveLine(item.Line, item.ProgramName) ?? string.Empty,
             item.Lane ?? string.Empty,
+            $"{ErrorLogHelper.GetSideLabel(ErrorLogHelper.ParseSide(item.ProgramName))} ({ErrorLogHelper.ParseSide(item.ProgramName)})",
+            ErrorLogHelper.ParseMachine(item.ProgramName),
             item.Table ?? string.Empty,
             item.Error ?? string.Empty,
             item.EventNo ?? string.Empty,
@@ -136,6 +144,28 @@ public class LogExportService : ILogExportService
         });
 
         return Export("tong-hop-errorlog", ErrorLogSummaryHeaders, rows, format, baseFileName);
+    }
+
+    public FileExportResult ExportErrorLogDetailSummary(IReadOnlyList<ErrorLogDetailSummaryItem> items, ExportFormat format, string baseFileName)
+    {
+        var rows = items.Select(item => new string[]
+        {
+            item.Error,
+            item.Line,
+            item.Lane,
+            $"{item.SideLabel} ({item.Side})",
+            item.Machine,
+            item.Table,
+            item.EventNo,
+            item.Count.ToString(CultureInfo.InvariantCulture)
+        })
+        .Append([
+            "Tổng cộng (đã lọc)",
+            string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
+            items.Sum(item => item.Count).ToString(CultureInfo.InvariantCulture)
+        ]);
+
+        return Export("tong-hop-errorlog-chi-tiet", ErrorLogDetailSummaryHeaders, rows, format, baseFileName);
     }
 
     public FileExportResult ExportExpensiveParts(IReadOnlyList<ExpensivePartSummaryItem> items, ExportFormat format, string baseFileName)

@@ -90,9 +90,9 @@
             </div>
         </div>
 
-        <div class="card shadow-sm mb-4">
+        <div class="card shadow-sm mb-4" id="errorlog-summary">
             <div class="card-body">
-                <h2 class="h5 card-title mb-3">Lọc ErrorLog</h2>
+                <h2 class="h5 card-title mb-3">Lọc tổng hợp ErrorLog</h2>
                 <form method="get" class="row g-3">
                     <input type="hidden" asp-for="SelectedMonth" />
                     <input type="hidden" asp-for="SearchMonth" />
@@ -100,30 +100,161 @@
                         <label asp-for="Filter.Error" class="form-label">Error</label>
                         <input asp-for="Filter.Error" class="form-control" placeholder="VD: PICK UP ERROR" />
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label asp-for="Filter.Line" class="form-label">Line</label>
                         <input asp-for="Filter.Line" class="form-control" placeholder="VD: Line 1" />
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label asp-for="Filter.Lane" class="form-label">Lane</label>
                         <input asp-for="Filter.Lane" class="form-control" placeholder="VD: Lane 1" />
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
+                        <label asp-for="Filter.Side" class="form-label">Mặt</label>
+                        <input asp-for="Filter.Side" class="form-control" placeholder="VD: B hoặc Bot" />
+                    </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.Machine" class="form-label">Máy</label>
+                        <input asp-for="Filter.Machine" class="form-control" placeholder="VD: F" />
+                    </div>
+                    <div class="col-md-2">
                         <label asp-for="Filter.Table" class="form-label">Table</label>
                         <input asp-for="Filter.Table" class="form-control" placeholder="VD: A" />
                     </div>
+                    <div class="col-md-3">
+                        <label asp-for="Filter.SortDirection" class="form-label">Sắp xếp bảng</label>
+                        <select asp-for="Filter.SortDirection" class="form-select">
+                            <option value="location">Line → Lane → Mặt → Máy</option>
+                            <option value="desc">Số lần: Lớn → Nhỏ</option>
+                            <option value="asc">Số lần: Nhỏ → Lớn</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label asp-for="TopN" class="form-label">Top lỗi</label>
+                        <select asp-for="TopN" class="form-select">
+                            @foreach (var option in Model.TopNChoices)
+                            {
+                                <option value="@option">Top @option</option>
+                            }
+                        </select>
+                    </div>
                     <div class="col-12 d-flex gap-2">
                         <button type="submit" class="btn btn-primary">Áp dụng</button>
-                        <a asp-page="./ErrorLogDataByMonth" asp-route-SelectedMonth="@Model.SelectedMonth" class="btn btn-outline-secondary">Xóa bộ lọc</a>
+                        <a asp-page="./ErrorLogDataByMonth" asp-route-SelectedMonth="@Model.SelectedMonth" asp-route-SearchMonth="@Model.SearchMonth" class="btn btn-outline-secondary">Xóa bộ lọc</a>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        @if (Model.TopErrors.Count > 0)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h2 class="h5 card-title mb-1">Biểu đồ Top @Model.TopN lỗi nhiều nhất</h2>
+                            <div class="chart-wrapper">
+                                <canvas id="monthlyTopErrorsChart" aria-label="Biểu đồ top lỗi theo tháng"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h2 class="h5 card-title mb-1">Thống kê Top @Model.TopN</h2>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 48px;">#</th>
+                                            <th>Error</th>
+                                            <th class="text-end">Số lần</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in Model.TopErrors)
+                                        {
+                                            <tr>
+                                                <td class="fw-semibold">@item.Rank</td>
+                                                <td class="error-name-cell">
+                                                    <button type="button"
+                                                            class="btn p-0 fw-semibold text-start error-name-filter"
+                                                            data-error-name="@item.Error">
+                                                        <span class="@ErrorLogHelper.GetErrorNameCssClass(item.Error)">@item.Error</span>
+                                                    </button>
+                                                </td>
+                                                <td class="text-end fw-semibold text-danger">@item.TotalCount.ToString("N0")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                    <h2 class="h5 card-title mb-0">Tổng hợp ErrorLog tháng @Model.SelectedMonth</h2>
+                    <div class="d-flex gap-2">
+                        <a asp-page="./ErrorLogDataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("DetailSummary", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
+                        <a asp-page="./ErrorLogDataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("DetailSummary", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                    </div>
+                </div>
+                @if (Model.DetailSummary.Count == 0)
+                {
+                    <div class="alert alert-warning mb-0">Không có dữ liệu phù hợp với bộ lọc.</div>
+                }
+                else
+                {
+                    <div class="table-responsive summary-table-wrapper">
+                        <table class="table table-sm table-striped table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Error</th>
+                                    <th>Line</th>
+                                    <th>Lane</th>
+                                    <th>Mặt</th>
+                                    <th>Máy</th>
+                                    <th>Table</th>
+                                    <th>Event No.</th>
+                                    <th class="text-end">Số lần</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.DetailSummary)
+                                {
+                                    <tr>
+                                        <td class="error-name-cell"><span class="@ErrorLogHelper.GetErrorNameCssClass(item.Error)">@item.Error</span></td>
+                                        <td>@item.Line</td>
+                                        <td>@item.Lane</td>
+                                        <td>@item.SideLabel (@item.Side)</td>
+                                        <td>@item.Machine</td>
+                                        <td>@item.Table</td>
+                                        <td>@item.EventNo</td>
+                                        <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary fw-semibold">
+                                    <td colspan="7">Tổng cộng (đã lọc)</td>
+                                    <td class="text-end">@Model.FilteredErrorCount.ToString("N0")</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                }
             </div>
         </div>
 
         <div class="card shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                    <h2 class="h5 card-title mb-0">Tổng hợp ErrorLog tháng @Model.SelectedMonth</h2>
+                    <h2 class="h5 card-title mb-0">Tổng hợp theo loại lỗi</h2>
                     <div class="d-flex gap-2">
                         <a asp-page="./ErrorLogDataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
                         <a asp-page="./ErrorLogDataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
@@ -140,7 +271,9 @@
                             @foreach (var item in Model.Summary)
                             {
                                 <tr>
-                                    <td class="error-name-cell"><span class="@ErrorLogHelper.GetErrorNameCssClass(item.Error)">@item.Error</span></td><td>@item.EventNo</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                    <td class="error-name-cell"><span class="@ErrorLogHelper.GetErrorNameCssClass(item.Error)">@item.Error</span></td>
+                                    <td>@item.EventNo</td>
+                                    <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
                                 </tr>
                             }
                         </tbody>
@@ -163,16 +296,34 @@
                     <table class="table table-sm table-bordered table-hover align-middle mb-0">
                         <thead class="table-light sticky-top">
                             <tr>
-                                <th>Event Date</th><th>Line</th><th>Lane</th><th>Table</th><th>Error</th><th>Event No.</th><th>Program Name</th><th>Details</th>
+                                <th>Event Date</th>
+                                <th>Line</th>
+                                <th>Lane</th>
+                                <th>Mặt</th>
+                                <th>Máy</th>
+                                <th>Table</th>
+                                <th>Error</th>
+                                <th>Event No.</th>
+                                <th>Program Name</th>
+                                <th>Details</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var row in Model.Entries)
                             {
+                                var side = ErrorLogHelper.ParseSide(row.ProgramName);
+                                var machine = ErrorLogHelper.ParseMachine(row.ProgramName);
                                 <tr>
-                                    <td>@row.EventDate</td><td>@row.Line</td><td>@row.Lane</td><td>@row.Table</td>
+                                    <td>@row.EventDate</td>
+                                    <td>@ErrorLogHelper.GetEffectiveLine(row.Line, row.ProgramName)</td>
+                                    <td>@row.Lane</td>
+                                    <td>@ErrorLogHelper.GetSideLabel(side) (@side)</td>
+                                    <td>@machine</td>
+                                    <td>@row.Table</td>
                                     <td class="error-name-cell"><span class="@ErrorLogHelper.GetErrorNameCssClass(row.Error)">@row.Error</span></td>
-                                    <td>@row.EventNo</td><td>@row.ProgramName</td><td>@row.Details</td>
+                                    <td>@row.EventNo</td>
+                                    <td>@row.ProgramName</td>
+                                    <td>@row.Details</td>
                                 </tr>
                             }
                         </tbody>
@@ -199,3 +350,60 @@
         </div>
     }
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        (function () {
+            document.querySelectorAll('.error-name-filter').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var parameters = new URLSearchParams(window.location.search);
+                    parameters.set('Filter.Error', button.dataset.errorName);
+                    window.location.href = window.location.pathname + '?' + parameters.toString() + '#errorlog-summary';
+                });
+            });
+
+            var chartCanvas = document.getElementById('monthlyTopErrorsChart');
+            if (!chartCanvas) {
+                return;
+            }
+
+            var chartData = @Html.Raw(Model.ChartDataJson);
+            if (!chartData.length) {
+                return;
+            }
+
+            var labels = chartData.map(function (item) { return item.error; });
+            var values = chartData.map(function (item) { return item.totalCount; });
+
+            new Chart(chartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Số lần lỗi',
+                        data: values,
+                        backgroundColor: 'rgba(220, 53, 69, 0.75)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+}
