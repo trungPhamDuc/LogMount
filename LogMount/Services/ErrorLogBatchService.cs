@@ -8,6 +8,7 @@ public interface IErrorLogBatchService
 {
     Task<string> RunAsync(DateOnly date, CancellationToken cancellationToken = default);
     Task<string> RunMonthAsync(DateOnly month, CancellationToken cancellationToken = default);
+    Task EnsureInfrastructureAsync(DateOnly date, CancellationToken cancellationToken = default);
 }
 
 public class ErrorLogBatchService : IErrorLogBatchService
@@ -27,10 +28,12 @@ public class ErrorLogBatchService : IErrorLogBatchService
     private static readonly SemaphoreSlim BatchLock = new(1, 1);
 
     private readonly IConfiguration _configuration;
+    private readonly IBatchStoragePathResolver _pathResolver;
 
-    public ErrorLogBatchService(IConfiguration configuration)
+    public ErrorLogBatchService(IConfiguration configuration, IBatchStoragePathResolver pathResolver)
     {
         _configuration = configuration;
+        _pathResolver = pathResolver;
     }
 
     public async Task<string> RunAsync(DateOnly date, CancellationToken cancellationToken = default)
@@ -49,6 +52,30 @@ public class ErrorLogBatchService : IErrorLogBatchService
         return await RunInternalAsync($"ErrLog{monthText}**.csv", outputFilePath, cancellationToken);
     }
 
+    public async Task EnsureInfrastructureAsync(DateOnly date, CancellationToken cancellationToken = default)
+    {
+        var dateText = date.ToString("yyyyMMdd");
+        var outputFilePath = ResolveOutputFilePath("OutputFileTemplate", dateText, date.ToString("yyyyMM"), date.ToString("MM"));
+        var batchFilePath = ResolveBatchFilePath();
+
+        var batchDirectory = Path.GetDirectoryName(batchFilePath);
+        if (!string.IsNullOrWhiteSpace(batchDirectory))
+        {
+            Directory.CreateDirectory(batchDirectory);
+        }
+
+        var outputDirectory = Path.GetDirectoryName(outputFilePath);
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        if (!File.Exists(batchFilePath))
+        {
+            await CreateDefaultBatchFileAsync(batchFilePath, $"ErrLog{dateText}.csv", outputFilePath, cancellationToken);
+        }
+    }
+
     private string ResolveOutputFilePath(string templateKey, string dateText, string monthText, string monthNumber)
     {
         var outputFileTemplate = _configuration[$"ErrorLogBatch:{templateKey}"];
@@ -61,21 +88,18 @@ public class ErrorLogBatchService : IErrorLogBatchService
             throw new InvalidOperationException("Chưa cấu hình ErrorLogBatch trong appsettings.json.");
         }
 
-        return outputFileTemplate
+        return _pathResolver.Resolve(outputFileTemplate
             .Replace("{date}", dateText, StringComparison.Ordinal)
             .Replace("{month}", monthText, StringComparison.Ordinal)
             .Replace("{yyyyMM}", monthText, StringComparison.Ordinal)
-            .Replace("{MM}", monthNumber, StringComparison.Ordinal);
+            .Replace("{MM}", monthNumber, StringComparison.Ordinal));
     }
+
+    private string ResolveBatchFilePath() => _pathResolver.Resolve(_configuration["ErrorLogBatch:BatchFilePath"] ?? string.Empty);
 
     private async Task<string> RunInternalAsync(string errorLogFileName, string outputFilePath, CancellationToken cancellationToken)
     {
-        var batchFilePath = _configuration["ErrorLogBatch:BatchFilePath"];
-
-        if (string.IsNullOrWhiteSpace(batchFilePath))
-        {
-            throw new InvalidOperationException("Chưa cấu hình ErrorLogBatch trong appsettings.json.");
-        }
+        var batchFilePath = ResolveBatchFilePath();
 
         await BatchLock.WaitAsync(cancellationToken);
         try
@@ -153,7 +177,7 @@ public class ErrorLogBatchService : IErrorLogBatchService
             Directory.CreateDirectory(batchDirectory);
         }
 
-        var retryLogBatchFilePath = _configuration["RetryLogBatch:BatchFilePath"];
+        var retryLogBatchFilePath = _pathResolver.Resolve(_configuration["RetryLogBatch:BatchFilePath"] ?? string.Empty);
         var content = !string.IsNullOrWhiteSpace(retryLogBatchFilePath) && File.Exists(retryLogBatchFilePath)
             ? await CreateBatchFromRetryLogTemplateAsync(retryLogBatchFilePath, cancellationToken)
             : CreateMinimalBatchContent(errorLogFileName, outputFilePath);

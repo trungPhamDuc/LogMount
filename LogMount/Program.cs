@@ -41,6 +41,7 @@ builder.Services.AddSession(options =>
 });
 builder.Services.AddScoped<IRetryLogParserService, RetryLogParserService>();
 builder.Services.AddScoped<IRetryLogImportService, RetryLogImportService>();
+builder.Services.AddSingleton<IBatchStoragePathResolver, BatchStoragePathResolver>();
 builder.Services.AddSingleton<IRetryLogBatchService, RetryLogBatchService>();
 builder.Services.AddScoped<IErrorLogParserService, ErrorLogParserService>();
 builder.Services.AddScoped<IErrorLogImportService, ErrorLogImportService>();
@@ -51,6 +52,7 @@ builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();
 builder.Services.AddSingleton<ILogExportService, LogExportService>();
 builder.Services.AddHostedService<RetryLogAutoImportService>();
 builder.Services.AddHostedService<ErrorLogAutoImportService>();
+builder.Services.AddHostedService<BatchInfrastructureInitializer>();
 
 var app = builder.Build();
 
