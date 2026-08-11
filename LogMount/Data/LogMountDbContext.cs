@@ -13,6 +13,7 @@ public class LogMountDbContext : DbContext
     public DbSet<RetryLogEntry> RetryLogEntries => Set<RetryLogEntry>();
     public DbSet<ErrorLogEntry> ErrorLogEntries => Set<ErrorLogEntry>();
     public DbSet<ExpensivePart> ExpensiveParts => Set<ExpensivePart>();
+    public DbSet<AutoImportState> AutoImportStates => Set<AutoImportState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +48,13 @@ public class LogMountDbContext : DbContext
             entity.HasIndex(x => x.ErrorNo);
             entity.HasIndex(x => x.Line);
             entity.HasIndex(x => x.UploadedAt);
+        });
+
+        modelBuilder.Entity<AutoImportState>(entity =>
+        {
+            entity.HasKey(x => x.JobName);
+            entity.Property(x => x.JobName).HasMaxLength(100);
+            entity.Property(x => x.LastRunDate).HasMaxLength(10);
         });
 
         modelBuilder.Entity<ExpensivePart>(entity =>

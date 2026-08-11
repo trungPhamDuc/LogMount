@@ -22,6 +22,27 @@ namespace LogMount.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LogMount.Models.AutoImportState", b =>
+                {
+                    b.Property<string>("JobName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LastCompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastRunDate")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("LastStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("JobName");
+
+                    b.ToTable("AutoImportStates");
+                });
+
             modelBuilder.Entity("LogMount.Models.ExpensivePart", b =>
                 {
                     b.Property<int>("Id")
