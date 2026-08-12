@@ -25,6 +25,10 @@ public class RetryLogBatchService : IRetryLogBatchService
     private static readonly Regex PauseCommandPattern = new(
         @"(?im)^\s*pause\s*$",
         RegexOptions.CultureInvariant);
+    private static readonly Regex LocalRetryLogRootPattern = new(
+        @"(?<!\\)[A-Z]:\\LOG\\RetryLog",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly string[] FallbackDriveRoots = ["E:\\", "D:\\", "C:\\"];
     private static readonly SemaphoreSlim BatchLock = new(1, 1);
 
     private readonly IConfiguration _configuration;
@@ -88,14 +92,14 @@ public class RetryLogBatchService : IRetryLogBatchService
             throw new InvalidOperationException("Chưa cấu hình RetryLogBatch trong appsettings.json.");
         }
 
-        return _pathResolver.Resolve(outputFileTemplate
+        return ResolveAvailableDrivePath(_pathResolver.Resolve(outputFileTemplate
             .Replace("{date}", dateText, StringComparison.Ordinal)
             .Replace("{month}", monthText, StringComparison.Ordinal)
             .Replace("{yyyyMM}", monthText, StringComparison.Ordinal)
-            .Replace("{MM}", monthNumber, StringComparison.Ordinal));
+            .Replace("{MM}", monthNumber, StringComparison.Ordinal)));
     }
 
-    private string ResolveBatchFilePath() => _pathResolver.Resolve(_configuration["RetryLogBatch:BatchFilePath"] ?? string.Empty);
+    private string ResolveBatchFilePath() => ResolveAvailableDrivePath(_pathResolver.Resolve(_configuration["RetryLogBatch:BatchFilePath"] ?? string.Empty));
 
     private async Task<string> RunInternalAsync(string retryLogFileName, string outputFilePath, CancellationToken cancellationToken)
     {
@@ -104,7 +108,7 @@ public class RetryLogBatchService : IRetryLogBatchService
         await BatchLock.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(batchFilePath))
+            if (!File.Exists(batchFilePath) || await IsGeneratedSingleSourceBatchAsync(batchFilePath, cancellationToken))
             {
                 await CreateDefaultBatchFileAsync(batchFilePath, retryLogFileName, outputFilePath, cancellationToken);
             }
@@ -115,6 +119,7 @@ public class RetryLogBatchService : IRetryLogBatchService
             updatedBatchContent = OutputRetryLogNamePattern.Replace(
                 updatedBatchContent,
                 Path.GetFileName(outputFilePath));
+            updatedBatchContent = NormalizeLocalRetryLogRoot(updatedBatchContent, outputFilePath);
             updatedBatchContent = PauseCommandPattern.Replace(updatedBatchContent, string.Empty);
 
             if (!string.Equals(batchContent, updatedBatchContent, StringComparison.Ordinal))
@@ -177,12 +182,70 @@ public class RetryLogBatchService : IRetryLogBatchService
             Directory.CreateDirectory(batchDirectory);
         }
 
+        var templateContent = await TryReadRetryLogBatchTemplateAsync(batchFilePath, cancellationToken);
+        var content = templateContent is not null
+            ? NormalizeLocalRetryLogRoot(templateContent, outputFilePath)
+            : CreateMinimalBatchContent(retryLogFileName, outputFilePath);
+
+        await File.WriteAllTextAsync(batchFilePath, content, new UTF8Encoding(false), cancellationToken);
+    }
+
+    private static async Task<bool> IsGeneratedSingleSourceBatchAsync(string batchFilePath, CancellationToken cancellationToken)
+    {
+        var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
+        return batchContent.Contains(@"set ""SOURCE=%~dp0", StringComparison.OrdinalIgnoreCase) &&
+               batchContent.Contains(@"copy /b ""%SOURCE%"" ""%OUTPUT%""", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task<string?> TryReadRetryLogBatchTemplateAsync(
+        string targetBatchFilePath,
+        CancellationToken cancellationToken)
+    {
+        foreach (var driveRoot in FallbackDriveRoots.Where(Directory.Exists))
+        {
+            var templateDirectory = Path.Combine(driveRoot, "LOG", "RetryLog");
+            if (!Directory.Exists(templateDirectory))
+            {
+                continue;
+            }
+
+            var candidates = Directory.GetFiles(templateDirectory, "*.bat")
+                .OrderByDescending(path => Path.GetFileName(path).Equals("TotalRetryLogDay.bat", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(path => path, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var candidate in candidates)
+            {
+                if (string.Equals(Path.GetFullPath(candidate), Path.GetFullPath(targetBatchFilePath), StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var content = await File.ReadAllTextAsync(candidate, cancellationToken);
+                if (IsUsableRetryLogTemplate(content))
+                {
+                    return content;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsUsableRetryLogTemplate(string content)
+    {
+        return !content.Contains(@"set ""SOURCE=%~dp0", StringComparison.OrdinalIgnoreCase) &&
+               content.Contains("RetryLog", StringComparison.OrdinalIgnoreCase) &&
+               content.Contains("COPY", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateMinimalBatchContent(string retryLogFileName, string outputFilePath)
+    {
         var outputDirectory = Path.GetDirectoryName(outputFilePath);
         var createOutputDirectoryCommand = string.IsNullOrWhiteSpace(outputDirectory)
             ? string.Empty
             : $"""if not exist "{outputDirectory}" mkdir "{outputDirectory}" """;
         var sourcePattern = retryLogFileName.Replace("**", "*", StringComparison.Ordinal);
-        var content = $"""
+        return $"""
 @echo off
 setlocal
 set "SOURCE=%~dp0{sourcePattern}"
@@ -191,7 +254,44 @@ set "OUTPUT={outputFilePath}"
 copy /b "%SOURCE%" "%OUTPUT%" /y
 endlocal
 """;
+    }
 
-        await File.WriteAllTextAsync(batchFilePath, content, new UTF8Encoding(false), cancellationToken);
+    private static string NormalizeLocalRetryLogRoot(string content, string outputFilePath)
+    {
+        var driveRoot = Path.GetPathRoot(outputFilePath);
+        var drive = !string.IsNullOrWhiteSpace(driveRoot) && driveRoot.Length >= 2
+            ? driveRoot[..2]
+            : "E:";
+        return LocalRetryLogRootPattern.Replace(content, $@"{drive}\LOG\RetryLog");
+    }
+
+    private static string ResolveAvailableDrivePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path))
+        {
+            return path;
+        }
+
+        var root = Path.GetPathRoot(path);
+        if (string.IsNullOrWhiteSpace(root) || !root.EndsWith(@":\", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        if (Directory.Exists(root))
+        {
+            return path;
+        }
+
+        var suffix = path[root.Length..];
+        foreach (var fallbackRoot in FallbackDriveRoots)
+        {
+            if (Directory.Exists(fallbackRoot))
+            {
+                return fallbackRoot + suffix;
+            }
+        }
+
+        return path;
     }
 }

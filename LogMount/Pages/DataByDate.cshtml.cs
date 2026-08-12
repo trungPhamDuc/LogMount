@@ -59,6 +59,7 @@ public class DataByDateModel : PageModel
 
     public IReadOnlyList<string> AvailableDates { get; set; } = [];
     public IReadOnlyList<RetryLogEntry> Entries { get; set; } = [];
+    public IReadOnlyList<ErrorSummaryItem> ErrorSummary { get; set; } = [];
     public int TotalRecords { get; set; }
     public int TotalPages { get; set; }
     public IReadOnlyList<DailyRetryLogSummary> DailySummaries { get; set; } = [];
@@ -117,16 +118,21 @@ public class DataByDateModel : PageModel
         var query = ApplyLogFilter(ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
             .Where(x => x.Date == SelectedDate), Filter);
 
-        TotalRecords = await query.CountAsync(cancellationToken);
+        var allRows = await query
+            .OrderByDescending(x => x.UploadedAt)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        allRows = RetryLogAnalysisService.ApplyTimeRangeFilter(allRows, Filter).ToList();
+        ErrorSummary = RetryLogAnalysisService.SummarizeErrors(allRows);
+        TotalRecords = allRows.Count;
         TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
         PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
 
-        Entries = await query
-            .OrderByDescending(x => x.UploadedAt)
-            .ThenBy(x => x.Id)
+        Entries = allRows
             .Skip((PageNumber - 1) * PageSize)
             .Take(PageSize)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         if (ShowExpensiveParts)
         {
@@ -194,6 +200,7 @@ public class DataByDateModel : PageModel
                     .OrderByDescending(x => x.UploadedAt)
                     .ThenBy(x => x.Id)
                     .ToListAsync(cancellationToken);
+                logRows = RetryLogAnalysisService.ApplyTimeRangeFilter(logRows, Filter).ToList();
 
                 if (logRows.Count == 0)
                 {
@@ -201,6 +208,24 @@ public class DataByDateModel : PageModel
                 }
 
                 exportResult = _exportService.ExportLogs(logRows, exportFormat, baseFileName);
+                break;
+
+            case "summary":
+                var summaryRows = await ApplyLogFilter(ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
+                    .Where(x => x.Date == SelectedDate),
+                    Filter)
+                    .OrderByDescending(x => x.UploadedAt)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(cancellationToken);
+                summaryRows = RetryLogAnalysisService.ApplyTimeRangeFilter(summaryRows, Filter).ToList();
+                var errorSummary = RetryLogAnalysisService.SummarizeErrors(summaryRows);
+
+                if (errorSummary.Count == 0)
+                {
+                    return BadRequest("KhÃ´ng cÃ³ dá»¯ liá»‡u tá»•ng há»£p lá»—i Ä‘á»ƒ táº£i xuá»‘ng.");
+                }
+
+                exportResult = _exportService.ExportErrors(errorSummary, exportFormat, baseFileName);
                 break;
 
             case "expensiveparts":
@@ -235,7 +260,7 @@ public class DataByDateModel : PageModel
 
     public Dictionary<string, string?> GetRouteValues(int pageNumber)
     {
-        return new Dictionary<string, string?>
+        var values = new Dictionary<string, string?>
         {
             ["SelectedDate"] = SelectedDate,
             ["SearchDate"] = SearchDate,
@@ -247,11 +272,12 @@ public class DataByDateModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
-            ["Filter.ErrorName"] = Filter.ErrorName,
-            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
+
+        AddLogFilterRouteValues(values);
+        return values;
     }
 
     public Dictionary<string, string?> GetPartRouteValues()
@@ -269,7 +295,7 @@ public class DataByDateModel : PageModel
 
     public Dictionary<string, string?> GetPartPaginationRouteValues(int pageNumber)
     {
-        return new Dictionary<string, string?>
+        var values = new Dictionary<string, string?>
         {
             ["SelectedDate"] = SelectedDate,
             ["SearchDate"] = SearchDate,
@@ -281,16 +307,17 @@ public class DataByDateModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
-            ["Filter.ErrorName"] = Filter.ErrorName,
-            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = "true"
         };
+
+        AddLogFilterRouteValues(values);
+        return values;
     }
 
     public Dictionary<string, string?> GetExportRouteValues(string section, string format, bool summaryOnly = false)
     {
-        return new Dictionary<string, string?>
+        var values = new Dictionary<string, string?>
         {
             ["section"] = section,
             ["format"] = format,
@@ -305,11 +332,24 @@ public class DataByDateModel : PageModel
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
-            ["Filter.ErrorName"] = Filter.ErrorName,
-            ["Filter.PartsName"] = Filter.PartsName,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
         };
+
+        AddLogFilterRouteValues(values);
+        return values;
+    }
+
+    private void AddLogFilterRouteValues(Dictionary<string, string?> values)
+    {
+        values["Filter.Line"] = Filter.Line;
+        values["Filter.ErrorNo"] = Filter.ErrorNo;
+        values["Filter.ErrorName"] = Filter.ErrorName;
+        values["Filter.Lane"] = Filter.Lane;
+        values["Filter.Table"] = Filter.Table;
+        values["Filter.PartsName"] = Filter.PartsName;
+        values["Filter.TimeFrom"] = Filter.TimeFrom;
+        values["Filter.TimeTo"] = Filter.TimeTo;
     }
 
     private async Task LoadExpensivePartSummaryAsync(
@@ -416,6 +456,30 @@ public class DataByDateModel : PageModel
         {
             var errorName = criteria.ErrorName.Trim();
             query = query.Where(x => x.ErrorName != null && x.ErrorName.Contains(errorName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.Line))
+        {
+            var line = criteria.Line.Trim();
+            query = query.Where(x => x.Line != null && x.Line.Contains(line));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.ErrorNo))
+        {
+            var errorNo = criteria.ErrorNo.Trim();
+            query = query.Where(x => x.ErrorNo != null && x.ErrorNo.Contains(errorNo));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.Lane))
+        {
+            var lane = criteria.Lane.Trim();
+            query = query.Where(x => x.Lane != null && x.Lane.Contains(lane));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.Table))
+        {
+            var table = criteria.Table.Trim();
+            query = query.Where(x => x.Table != null && x.Table.Contains(table));
         }
 
         if (!string.IsNullOrWhiteSpace(criteria.PartsName))

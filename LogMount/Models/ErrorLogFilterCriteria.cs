@@ -13,6 +13,8 @@ public class ErrorLogFilterCriteria
     public string? Details { get; set; }
     public string? Side { get; set; }
     public string? Machine { get; set; }
+    public string? TimeFrom { get; set; }
+    public string? TimeTo { get; set; }
     public string SortDirection { get; set; } = "location";
 
     public bool IsCountSort =>
@@ -33,7 +35,9 @@ public class ErrorLogFilterCriteria
         !string.IsNullOrWhiteSpace(ProgramName) ||
         !string.IsNullOrWhiteSpace(Details) ||
         !string.IsNullOrWhiteSpace(Side) ||
-        !string.IsNullOrWhiteSpace(Machine);
+        !string.IsNullOrWhiteSpace(Machine) ||
+        !string.IsNullOrWhiteSpace(TimeFrom) ||
+        !string.IsNullOrWhiteSpace(TimeTo);
 
     public bool HasSummaryFilter =>
         HasAnyFilter ||

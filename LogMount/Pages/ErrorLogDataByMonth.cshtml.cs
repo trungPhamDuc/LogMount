@@ -89,6 +89,7 @@ public class ErrorLogDataByMonthModel : PageModel
             .ThenBy(x => x.EventDate)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
+        allRows = ErrorLogAnalysisService.Filter(allRows, Filter).ToList();
 
         Summary = ErrorLogAnalysisService.SummarizeErrors(allRows);
         TotalRecords = allRows.Count;
@@ -159,6 +160,7 @@ public class ErrorLogDataByMonthModel : PageModel
             .ThenBy(x => x.EventDate)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
+        rows = ErrorLogAnalysisService.Filter(rows, Filter).ToList();
 
         if (rows.Count == 0)
         {
@@ -196,6 +198,8 @@ public class ErrorLogDataByMonthModel : PageModel
             ["Filter.Table"] = Filter.Table,
             ["Filter.Side"] = Filter.Side,
             ["Filter.Machine"] = Filter.Machine,
+            ["Filter.TimeFrom"] = Filter.TimeFrom,
+            ["Filter.TimeTo"] = Filter.TimeTo,
             ["Filter.SortDirection"] = Filter.SortDirection,
             ["TopN"] = TopN.ToString()
         };

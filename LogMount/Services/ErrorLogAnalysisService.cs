@@ -1,3 +1,4 @@
+using System.Globalization;
 using LogMount.Models;
 
 namespace LogMount.Services;
@@ -23,6 +24,7 @@ public static class ErrorLogAnalysisService
         query = ApplyContainsFilter(query, criteria.Details, e => e.Details);
         query = ApplySideFilter(query, criteria.Side);
         query = ApplyMachineFilter(query, criteria.Machine);
+        query = ApplyTimeRangeFilter(query, criteria);
 
         return query.ToList();
     }
@@ -204,6 +206,59 @@ public static class ErrorLogAnalysisService
 
         var trimmed = value.Trim();
         return query.Where(e => selector(e)?.Contains(trimmed, StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    public static IReadOnlyList<ErrorLogEntry> ApplyTimeRangeFilter(
+        IReadOnlyList<ErrorLogEntry> entries,
+        ErrorLogFilterCriteria criteria)
+    {
+        return ApplyTimeRangeFilter(entries.AsEnumerable(), criteria).ToList();
+    }
+
+    private static IEnumerable<ErrorLogEntry> ApplyTimeRangeFilter(
+        IEnumerable<ErrorLogEntry> query,
+        ErrorLogFilterCriteria criteria)
+    {
+        var hasFrom = TimeOnly.TryParse(criteria.TimeFrom, out var from);
+        var hasTo = TimeOnly.TryParse(criteria.TimeTo, out var to);
+        if (!hasFrom && !hasTo)
+        {
+            return query;
+        }
+
+        return query.Where(entry =>
+        {
+            if (!TryParseTimeOfDay(entry.EventDate, out var time))
+            {
+                return false;
+            }
+
+            return (!hasFrom || time >= from) && (!hasTo || time <= to);
+        });
+    }
+
+    private static bool TryParseTimeOfDay(string? value, out TimeOnly time)
+    {
+        time = default;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateTime) ||
+            DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out dateTime))
+        {
+            time = TimeOnly.FromDateTime(dateTime);
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length >= 16 && TimeOnly.TryParse(trimmed.Substring(11, 5), out time))
+        {
+            return true;
+        }
+
+        return TimeOnly.TryParse(trimmed, out time);
     }
 
     private static string DistinctValues(IEnumerable<ErrorLogEntry> entries, Func<ErrorLogEntry, string?> selector)

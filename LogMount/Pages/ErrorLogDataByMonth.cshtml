@@ -120,6 +120,14 @@
                         <label asp-for="Filter.Table" class="form-label">Table</label>
                         <input asp-for="Filter.Table" class="form-control" placeholder="VD: A" />
                     </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.TimeFrom" class="form-label">Từ giờ</label>
+                        <input asp-for="Filter.TimeFrom" type="time" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.TimeTo" class="form-label">Đến giờ</label>
+                        <input asp-for="Filter.TimeTo" type="time" class="form-control" />
+                    </div>
                     <div class="col-md-3">
                         <label asp-for="Filter.SortDirection" class="form-label">Sắp xếp bảng</label>
                         <select asp-for="Filter.SortDirection" class="form-select">
