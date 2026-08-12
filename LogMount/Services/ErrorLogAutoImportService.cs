@@ -1,15 +1,13 @@
 using LogMount.Data;
+using LogMount.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace LogMount.Services;
 
 public class ErrorLogAutoImportService : BackgroundService
 {
+    private const string PreviousDayReimportJobName = "ErrorLogPreviousDayReimport";
     private static readonly TimeSpan PreviousDayReimportTime = new(7, 30, 0);
-    private static readonly string PreviousDayReimportStateFilePath = Path.Combine(
-        Path.GetTempPath(),
-        "LogMount",
-        "previous-day-reimport-errorlog-state.txt");
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
@@ -38,7 +36,9 @@ public class ErrorLogAutoImportService : BackgroundService
             await ReimportPreviousDayIfDueAsync(now, stoppingToken);
 
             now = DateTime.Now;
-            var nextRunTime = GetNextRunTime(now, GetLastPreviousDayReimportDate(DateOnly.FromDateTime(now)));
+            var nextRunTime = GetNextRunTime(
+                now,
+                await GetLastPreviousDayReimportDateAsync(DateOnly.FromDateTime(now), stoppingToken));
             var delay = nextRunTime - now;
             var shouldImportToday = IsHourlyRun(nextRunTime);
 
@@ -134,8 +134,7 @@ public class ErrorLogAutoImportService : BackgroundService
     private async Task ReimportPreviousDayIfDueAsync(DateTime now, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(now);
-        if (now.TimeOfDay < PreviousDayReimportTime ||
-            GetLastPreviousDayReimportDate(today) == today)
+        if (now.TimeOfDay < PreviousDayReimportTime)
         {
             return;
         }
@@ -147,6 +146,11 @@ public class ErrorLogAutoImportService : BackgroundService
             var batchService = scope.ServiceProvider.GetRequiredService<IErrorLogBatchService>();
             var parserService = scope.ServiceProvider.GetRequiredService<IErrorLogParserService>();
             var importService = scope.ServiceProvider.GetRequiredService<IErrorLogImportService>();
+
+            if (!await TryClaimPreviousDayReimportAsync(dbContext, today, cancellationToken))
+            {
+                return;
+            }
 
             var previousDate = today.AddDays(-1);
             var previousDateText = previousDate.ToString("yyyy/MM/dd");
@@ -167,7 +171,7 @@ public class ErrorLogAutoImportService : BackgroundService
                 DateTime.Now,
                 cancellationToken);
 
-            SaveLastPreviousDayReimportDate(today);
+            await MarkPreviousDayReimportCompletedAsync(dbContext, today, cancellationToken);
 
             _logger.LogInformation(
                 "Reimported previous day error log for {Date}. Deleted {DeletedCount} rows, parsed {ParsedCount} rows, saved {SavedCount} rows.",
@@ -185,37 +189,89 @@ public class ErrorLogAutoImportService : BackgroundService
         }
     }
 
-    private static DateOnly? GetLastPreviousDayReimportDate(DateOnly today)
+    private async Task<DateOnly?> GetLastPreviousDayReimportDateAsync(DateOnly today, CancellationToken cancellationToken)
     {
-        if (!File.Exists(PreviousDayReimportStateFilePath))
+        try
         {
+            using var scope = _scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<LogMountDbContext>();
+            var state = await dbContext.AutoImportStates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.JobName == PreviousDayReimportJobName, cancellationToken);
+
+            if (state?.LastRunDate is null ||
+                !DateOnly.TryParseExact(state.LastRunDate, "yyyy-MM-dd", out var stateDate))
+            {
+                return null;
+            }
+
+            return stateDate == today ? stateDate : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not read previous day error log reimport state.");
             return null;
         }
-
-        var stateText = File.ReadAllText(PreviousDayReimportStateFilePath).Trim();
-        if (!DateOnly.TryParseExact(stateText, "yyyy-MM-dd", out var stateDate))
-        {
-            File.Delete(PreviousDayReimportStateFilePath);
-            return null;
-        }
-
-        if (stateDate == today)
-        {
-            return stateDate;
-        }
-
-        File.Delete(PreviousDayReimportStateFilePath);
-        return null;
     }
 
-    private static void SaveLastPreviousDayReimportDate(DateOnly date)
+    private static async Task<bool> TryClaimPreviousDayReimportAsync(
+        LogMountDbContext dbContext,
+        DateOnly today,
+        CancellationToken cancellationToken)
     {
-        var stateDirectory = Path.GetDirectoryName(PreviousDayReimportStateFilePath);
-        if (!string.IsNullOrWhiteSpace(stateDirectory))
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            cancellationToken);
+
+        var todayText = today.ToString("yyyy-MM-dd");
+        var state = await dbContext.AutoImportStates
+            .FirstOrDefaultAsync(x => x.JobName == PreviousDayReimportJobName, cancellationToken);
+
+        if (state?.LastRunDate == todayText)
         {
-            Directory.CreateDirectory(stateDirectory);
+            await transaction.CommitAsync(cancellationToken);
+            return false;
         }
 
-        File.WriteAllText(PreviousDayReimportStateFilePath, date.ToString("yyyy-MM-dd"));
+        if (state is null)
+        {
+            dbContext.AutoImportStates.Add(new AutoImportState
+            {
+                JobName = PreviousDayReimportJobName,
+                LastRunDate = todayText,
+                LastStartedAt = DateTime.Now
+            });
+        }
+        else
+        {
+            state.LastRunDate = todayText;
+            state.LastStartedAt = DateTime.Now;
+            state.LastCompletedAt = null;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    private static async Task MarkPreviousDayReimportCompletedAsync(
+        LogMountDbContext dbContext,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        var todayText = today.ToString("yyyy-MM-dd");
+        var state = await dbContext.AutoImportStates
+            .FirstOrDefaultAsync(x =>
+                x.JobName == PreviousDayReimportJobName &&
+                x.LastRunDate == todayText,
+                cancellationToken);
+
+        if (state is null)
+        {
+            return;
+        }
+
+        state.LastCompletedAt = DateTime.Now;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

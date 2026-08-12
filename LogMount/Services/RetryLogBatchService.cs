@@ -33,11 +33,16 @@ public class RetryLogBatchService : IRetryLogBatchService
 
     private readonly IConfiguration _configuration;
     private readonly IBatchStoragePathResolver _pathResolver;
+    private readonly IHostEnvironment _environment;
 
-    public RetryLogBatchService(IConfiguration configuration, IBatchStoragePathResolver pathResolver)
+    public RetryLogBatchService(
+        IConfiguration configuration,
+        IBatchStoragePathResolver pathResolver,
+        IHostEnvironment environment)
     {
         _configuration = configuration;
         _pathResolver = pathResolver;
+        _environment = environment;
     }
 
     public async Task<string> RunAsync(DateOnly date, CancellationToken cancellationToken = default)
@@ -92,11 +97,12 @@ public class RetryLogBatchService : IRetryLogBatchService
             throw new InvalidOperationException("Chưa cấu hình RetryLogBatch trong appsettings.json.");
         }
 
-        return ResolveAvailableDrivePath(_pathResolver.Resolve(outputFileTemplate
+        var outputFilePath = ResolveAvailableDrivePath(_pathResolver.Resolve(outputFileTemplate
             .Replace("{date}", dateText, StringComparison.Ordinal)
             .Replace("{month}", monthText, StringComparison.Ordinal)
             .Replace("{yyyyMM}", monthText, StringComparison.Ordinal)
             .Replace("{MM}", monthNumber, StringComparison.Ordinal)));
+        return AlignPathToBatchDrive(outputFilePath);
     }
 
     private string ResolveBatchFilePath() => ResolveAvailableDrivePath(_pathResolver.Resolve(_configuration["RetryLogBatch:BatchFilePath"] ?? string.Empty));
@@ -114,13 +120,7 @@ public class RetryLogBatchService : IRetryLogBatchService
             }
 
             var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
-            var updatedBatchContent = DailyRetryLogNamePattern.Replace(batchContent, retryLogFileName);
-            updatedBatchContent = MonthlyRetryLogNamePattern.Replace(updatedBatchContent, retryLogFileName);
-            updatedBatchContent = OutputRetryLogNamePattern.Replace(
-                updatedBatchContent,
-                Path.GetFileName(outputFilePath));
-            updatedBatchContent = NormalizeLocalRetryLogRoot(updatedBatchContent, outputFilePath);
-            updatedBatchContent = PauseCommandPattern.Replace(updatedBatchContent, string.Empty);
+            var updatedBatchContent = PrepareBatchContent(batchContent, retryLogFileName, outputFilePath);
 
             if (!string.Equals(batchContent, updatedBatchContent, StringComparison.Ordinal))
             {
@@ -170,7 +170,7 @@ public class RetryLogBatchService : IRetryLogBatchService
         }
     }
 
-    private static async Task CreateDefaultBatchFileAsync(
+    private async Task CreateDefaultBatchFileAsync(
         string batchFilePath,
         string retryLogFileName,
         string outputFilePath,
@@ -182,10 +182,12 @@ public class RetryLogBatchService : IRetryLogBatchService
             Directory.CreateDirectory(batchDirectory);
         }
 
-        var templateContent = await TryReadRetryLogBatchTemplateAsync(batchFilePath, cancellationToken);
+        var templateContent = await TryReadRetryLogBatchTemplateAsync(batchFilePath, cancellationToken)
+                              ?? await TryReadBundledRetryLogBatchTemplateAsync(cancellationToken);
         var content = templateContent is not null
             ? NormalizeLocalRetryLogRoot(templateContent, outputFilePath)
             : CreateMinimalBatchContent(retryLogFileName, outputFilePath);
+        content = PrepareBatchContent(content, retryLogFileName, outputFilePath);
 
         await File.WriteAllTextAsync(batchFilePath, content, new UTF8Encoding(false), cancellationToken);
     }
@@ -231,6 +233,31 @@ public class RetryLogBatchService : IRetryLogBatchService
         return null;
     }
 
+    private async Task<string?> TryReadBundledRetryLogBatchTemplateAsync(CancellationToken cancellationToken)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(_environment.ContentRootPath, "BatchTemplates", "TotalRetryLogDay.bat"),
+            Path.Combine(AppContext.BaseDirectory, "BatchTemplates", "TotalRetryLogDay.bat")
+        };
+
+        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(candidate))
+            {
+                continue;
+            }
+
+            var content = await File.ReadAllTextAsync(candidate, cancellationToken);
+            if (IsUsableRetryLogTemplate(content))
+            {
+                return content;
+            }
+        }
+
+        return null;
+    }
+
     private static bool IsUsableRetryLogTemplate(string content)
     {
         return !content.Contains(@"set ""SOURCE=%~dp0", StringComparison.OrdinalIgnoreCase) &&
@@ -254,6 +281,17 @@ set "OUTPUT={outputFilePath}"
 copy /b "%SOURCE%" "%OUTPUT%" /y
 endlocal
 """;
+    }
+
+    private static string PrepareBatchContent(string content, string retryLogFileName, string outputFilePath)
+    {
+        var updatedContent = DailyRetryLogNamePattern.Replace(content, retryLogFileName);
+        updatedContent = MonthlyRetryLogNamePattern.Replace(updatedContent, retryLogFileName);
+        updatedContent = OutputRetryLogNamePattern.Replace(
+            updatedContent,
+            Path.GetFileName(outputFilePath));
+        updatedContent = NormalizeLocalRetryLogRoot(updatedContent, outputFilePath);
+        return PauseCommandPattern.Replace(updatedContent, string.Empty);
     }
 
     private static string NormalizeLocalRetryLogRoot(string content, string outputFilePath)
@@ -293,5 +331,25 @@ endlocal
         }
 
         return path;
+    }
+
+    private string AlignPathToBatchDrive(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path))
+        {
+            return path;
+        }
+
+        var batchRoot = Path.GetPathRoot(ResolveBatchFilePath());
+        var pathRoot = Path.GetPathRoot(path);
+        if (string.IsNullOrWhiteSpace(batchRoot) ||
+            string.IsNullOrWhiteSpace(pathRoot) ||
+            !batchRoot.EndsWith(@":\", StringComparison.Ordinal) ||
+            !pathRoot.EndsWith(@":\", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        return batchRoot + path[pathRoot.Length..];
     }
 }

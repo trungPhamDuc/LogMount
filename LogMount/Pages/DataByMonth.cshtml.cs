@@ -199,7 +199,7 @@ public class DataByMonthModel : PageModel
 
                 if (errorSummary.Count == 0)
                 {
-                    return BadRequest("KhÃ´ng cÃ³ dá»¯ liá»‡u tá»•ng há»£p lá»—i Ä‘á»ƒ táº£i xuá»‘ng.");
+                    return BadRequest("Khong co du lieu tong hop loi de tai xuong.");
                 }
 
                 exportResult = _exportService.ExportErrors(errorSummary, exportFormat, baseFileName);

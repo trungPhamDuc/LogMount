@@ -92,11 +92,12 @@ public class ErrorLogBatchService : IErrorLogBatchService
             throw new InvalidOperationException("Chưa cấu hình ErrorLogBatch trong appsettings.json.");
         }
 
-        return ResolveAvailableDrivePath(_pathResolver.Resolve(outputFileTemplate
+        var outputFilePath = ResolveAvailableDrivePath(_pathResolver.Resolve(outputFileTemplate
             .Replace("{date}", dateText, StringComparison.Ordinal)
             .Replace("{month}", monthText, StringComparison.Ordinal)
             .Replace("{yyyyMM}", monthText, StringComparison.Ordinal)
             .Replace("{MM}", monthNumber, StringComparison.Ordinal)));
+        return AlignPathToBatchDrive(outputFilePath);
     }
 
     private string ResolveBatchFilePath() => ResolveAvailableDrivePath(_pathResolver.Resolve(_configuration["ErrorLogBatch:BatchFilePath"] ?? string.Empty));
@@ -312,5 +313,25 @@ endlocal
         }
 
         return path;
+    }
+
+    private string AlignPathToBatchDrive(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path))
+        {
+            return path;
+        }
+
+        var batchRoot = Path.GetPathRoot(ResolveBatchFilePath());
+        var pathRoot = Path.GetPathRoot(path);
+        if (string.IsNullOrWhiteSpace(batchRoot) ||
+            string.IsNullOrWhiteSpace(pathRoot) ||
+            !batchRoot.EndsWith(@":\", StringComparison.Ordinal) ||
+            !pathRoot.EndsWith(@":\", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        return batchRoot + path[pathRoot.Length..];
     }
 }

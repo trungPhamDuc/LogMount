@@ -1,8 +1,7 @@
 namespace LogMount.Services;
 
 /// <summary>
-/// Resolves configured batch paths, falling back to the application's LOG folder
-/// when the configured drive is unavailable on the current computer.
+/// Resolves configured batch paths to shared LOG folders on fixed drives.
 /// </summary>
 public interface IBatchStoragePathResolver
 {
@@ -11,6 +10,9 @@ public interface IBatchStoragePathResolver
 
 public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
 {
+    private static readonly string[] ExistingPathDriveRoots = ["E:\\", "D:\\", "C:\\"];
+    private static readonly string[] NewPathDriveRoots = ["D:\\", "C:\\", "E:\\"];
+
     private readonly IHostEnvironment _environment;
     private readonly ILogger<BatchStoragePathResolver> _logger;
 
@@ -24,7 +26,7 @@ public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
     {
         if (string.IsNullOrWhiteSpace(configuredPath))
         {
-            throw new InvalidOperationException("Chưa cấu hình đường dẫn file batch.");
+            throw new InvalidOperationException("Chua cau hinh duong dan file batch.");
         }
 
         if (!Path.IsPathRooted(configuredPath))
@@ -33,19 +35,32 @@ public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
         }
 
         var root = Path.GetPathRoot(configuredPath);
-        if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
+        if (string.IsNullOrWhiteSpace(root) || !root.EndsWith(@":\", StringComparison.Ordinal))
         {
             return configuredPath;
         }
 
-        // E:\LOG\... becomes <application folder>\LOG\... when E: is unavailable.
-        var relativePath = string.IsNullOrWhiteSpace(root)
-            ? Path.GetFileName(configuredPath)
-            : configuredPath[root.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fallbackPath = Path.GetFullPath(Path.Combine(_environment.ContentRootPath, relativePath));
+        var suffix = configuredPath[root.Length..];
+        var existingPath = ExistingPathDriveRoots
+            .Select(driveRoot => driveRoot + suffix)
+            .FirstOrDefault(File.Exists);
+        if (!string.IsNullOrWhiteSpace(existingPath))
+        {
+            return existingPath;
+        }
+
+        var fallbackPath = NewPathDriveRoots
+            .Where(Directory.Exists)
+            .Select(driveRoot => driveRoot + suffix)
+            .FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(fallbackPath))
+        {
+            return configuredPath;
+        }
 
         _logger.LogWarning(
-            "Configured path {ConfiguredPath} is unavailable. Using local fallback {FallbackPath}.",
+            "Configured path {ConfiguredPath} was not found on E/D/C. Using shared fallback {FallbackPath}.",
             configuredPath,
             fallbackPath);
 
