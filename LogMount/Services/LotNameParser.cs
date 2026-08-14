@@ -3,7 +3,27 @@ namespace LogMount.Services;
 public static class LotNameParser
 {
     /// <summary>
-    /// Parses Lot Name like "EBR26597304_B_A_L12_V10_LANE2_24CY" into "L1-B-A".
+    /// Extracts date part from occurrenceTime string like "2026/08/13 10:37:30" => "2026/08/13".
+    /// </summary>
+    public static string ExtractDate(string? occurrenceTime)
+    {
+        if (string.IsNullOrWhiteSpace(occurrenceTime))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = occurrenceTime.Trim();
+        var spaceIndex = trimmed.IndexOf(' ');
+        if (spaceIndex > 0)
+        {
+            return trimmed[..spaceIndex];
+        }
+
+        return trimmed;
+    }
+
+    /// <summary>
+    /// Parses Lot Name like "EBR26597304_B_A_L12_V10_LANE2_24CY" into "L1-B-A" or "LLTE-B-A".
     /// </summary>
     public static string ParseLine(string? lotName)
     {
@@ -32,18 +52,31 @@ public static class LotNameParser
             }
         }
 
-        return $"L{lineNo}-{side}-{machine}";
+        var displayLine = (lineNo == "0" || lineSegment.Contains("LTE", StringComparison.OrdinalIgnoreCase))
+            ? "LLTE"
+            : $"L{lineNo}";
+
+        return $"{displayLine}-{side}-{machine}";
     }
 
     public static string ParseLineNumber(string? lotName)
     {
         if (TryParseLotNameParts(lotName, out _, out _, out var lineSegment))
         {
+            if (lineSegment.Contains("LTE", StringComparison.OrdinalIgnoreCase))
+            {
+                return "LLTE";
+            }
+
             if (lineSegment.Length > 1 && (lineSegment[0] == 'L' || lineSegment[0] == 'l'))
             {
                 var digits = lineSegment[1..];
                 if (digits.Length > 0)
                 {
+                    if (digits[0] == '0')
+                    {
+                        return "LLTE";
+                    }
                     return $"L{digits[0]}";
                 }
             }
@@ -81,11 +114,23 @@ public static class LotNameParser
             var segments = lineValue.Split('-', StringSplitOptions.RemoveEmptyEntries);
             if (segments.Length >= 3)
             {
-                return (segments[0], segments[1], segments[2]);
+                var line = segments[0];
+                if (string.Equals(line, "L0", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(line, "Line 0", StringComparison.OrdinalIgnoreCase))
+                {
+                    line = "LLTE";
+                }
+                return (line, segments[1], segments[2]);
             }
         }
 
-        return (ParseLineNumber(lotName), ParseSide(lotName), ParseMachine(lotName));
+        var parsedLine = ParseLineNumber(lotName);
+        if (string.Equals(parsedLine, "L0", StringComparison.OrdinalIgnoreCase))
+        {
+            parsedLine = "LLTE";
+        }
+
+        return (parsedLine, ParseSide(lotName), ParseMachine(lotName));
     }
 
     private static bool TryParseLotNameParts(
@@ -112,19 +157,7 @@ public static class LotNameParser
         side = parts[1].ToUpperInvariant();
         machine = parts[2].ToUpperInvariant();
         lineSegment = parts[3];
+
         return true;
-    }
-
-    public static string ExtractDate(string? occurrenceTime)
-    {
-        if (string.IsNullOrWhiteSpace(occurrenceTime))
-        {
-            return string.Empty;
-        }
-
-        var spaceIndex = occurrenceTime.IndexOf(' ');
-        return spaceIndex > 0
-            ? occurrenceTime[..spaceIndex].Trim()
-            : occurrenceTime.Trim();
     }
 }

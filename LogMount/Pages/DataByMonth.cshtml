@@ -183,7 +183,12 @@
                     <div class="col-lg-7">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h2 class="h5 card-title mb-1">Biểu đồ Top @Model.TopN linh kiện rơi nhiều nhất</h2>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h2 class="h5 card-title mb-0">Biểu đồ Top @Model.TopN linh kiện rơi nhiều nhất</h2>
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="downloadChartAsImage('monthlyTopPartsChart', 'Top_LinhKien_Thang.png')">
+                                        <i class="bi bi-camera-fill me-1"></i> Tải ảnh biểu đồ
+                                    </button>
+                                </div>
                                 <div class="chart-wrapper">
                                     <canvas id="monthlyTopPartsChart" aria-label="Biểu đồ top linh kiện theo tháng"></canvas>
                                 </div>
@@ -236,8 +241,8 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                         <h2 class="h5 card-title mb-0">Tổng hợp linh kiện đắt tiền</h2>
                         <div class="d-flex gap-2">
-                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Csv", true)' class="btn btn-outline-success btn-sm">Tải CSV</a>
-                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Xlsx", true)' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Csv", true)' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Xlsx", true)' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                         </div>
                     </div>
                     <div class="table-responsive summary-table-wrapper">
@@ -246,6 +251,7 @@
                                 <tr>
                                     <th>Parts Name</th><th>Line</th><th>Lane</th><th>Mặt</th><th>Máy</th><th>Feeder</th><th>Shift</th><th>Error Name</th>
                                     <th class="text-end">Tổng giá tiền</th><th class="text-end">Số lần</th>
+                                    <th class="text-center">Cải thiện</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -255,6 +261,11 @@
                                         <td class="fw-semibold">@item.PartsName</td><td>@item.Line</td><td>@item.Lane</td><td>@item.SideLabel (@item.Side)</td><td>@item.Machine</td><td>@item.FeederNo</td><td>@item.Shift</td>
                                         <td class="error-name-cell"><span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span></td>
                                         <td class="text-end fw-semibold text-danger">@item.TotalCost.ToString("N0") đồng</td><td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-secondary opacity-75 fw-semibold text-white py-0 px-2 fs-7" onclick="openRetryImproveModal('@item.PartsName', '@item.Line', '@item.Lane', '@item.Side', '@item.Machine', '@item.FeederNo')">
+                                                <i class="bi bi-tools"></i> Cải thiện
+                                            </button>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -263,6 +274,7 @@
                                     <td colspan="8">Tổng cộng (đã lọc)</td>
                                     <td class="text-end text-danger">@Model.CountExpensivePartSummary.Sum(item => item.TotalCost).ToString("N0") đồng</td>
                                     <td class="text-end">@Model.CountExpensivePartSummary.Sum(item => item.Count).ToString("N0")</td>
+                                    <td></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -275,8 +287,8 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                         <h2 class="h5 card-title mb-1">Chi tiết lỗi theo linh kiện đắt tiền</h2>
                         <div class="d-flex gap-2">
-                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
-                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                            <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("ExpensiveParts", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                         </div>
                     </div>
 
@@ -385,8 +397,8 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <h2 class="h5 card-title mb-0">Tổng hợp lỗi RetryLog tháng @Model.SelectedMonth</h2>
                     <div class="d-flex gap-2">
-                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">Táº£i CSV</a>
-                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">Táº£i Excel</a>
+                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                     </div>
                 </div>
                 @if (Model.ErrorSummary.Count == 0)
@@ -433,8 +445,8 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <h2 class="h5 card-title mb-1">Dữ liệu tháng @Model.SelectedMonth</h2>
                     <div class="d-flex gap-2">
-                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
-                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                        <a asp-page="./DataByMonth" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                         <form method="post"
                               asp-page-handler="Delete"
                               class="d-inline"

@@ -255,10 +255,19 @@ public static class ExpensivePartAnalysisService
             : int.MaxValue;
     }
 
-    private static string GetDisplayLine(string? line) =>
-        string.Equals(line?.Trim(), "L0", StringComparison.OrdinalIgnoreCase)
-            ? "LLTE"
-            : line ?? string.Empty;
+    private static string GetDisplayLine(string? line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return string.Empty;
+        var trimmed = line.Trim();
+        if (trimmed.Equals("L0", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("Line 0", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("Line LTE", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("LINELTE", StringComparison.OrdinalIgnoreCase))
+        {
+            return "LLTE";
+        }
+        return trimmed;
+    }
 
     private static int GetSideSortOrder(string? side) =>
         side?.Trim().Equals("B", StringComparison.OrdinalIgnoreCase) == true ? 0 :

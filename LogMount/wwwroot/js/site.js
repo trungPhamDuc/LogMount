@@ -1,5 +1,347 @@
-﻿// Cumulative multi-file upload: each file picker selection adds to the list
-// instead of replacing the previous selection.
+// Global helper to export any Chart.js canvas to PNG image with white background
+window.downloadChartAsImage = function (canvasId, defaultFileName) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        alert('Không tìm thấy biểu đồ để tải xuống!');
+        return;
+    }
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    var ctx = tempCanvas.getContext('2d');
+    
+    // Fill solid white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // Draw canvas content over white background
+    ctx.drawImage(canvas, 0, 0);
+
+    var link = document.createElement('a');
+    link.download = defaultFileName || 'bieu-do.png';
+    link.href = tempCanvas.toDataURL('image/png', 1.0);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+// Load RetryImprove History
+window.loadRetryImproveHistory = function() {
+    var tbody = document.getElementById('retryImproveHistoryTable');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Đang tải dữ liệu...</td></tr>';
+    
+    fetch('/api/improve/retry/list')
+        .then(function(r) { return r.json(); })
+        .then(function(list) {
+            if (!list || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Chưa có nhật ký hành động cải thiện nào được lưu.</td></tr>';
+                return;
+            }
+            var html = '';
+            list.forEach(function(item) {
+                var dateStr = item.executionDate ? new Date(item.executionDate).toLocaleDateString('vi-VN') : '';
+                var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : '';
+                html += '<tr>' +
+                    '<td class="fw-bold text-success">' + dateStr + '</td>' +
+                    '<td class="fw-bold text-primary">' + (item.partsName || '') + '</td>' +
+                    '<td>' + (item.line || '') + '</td>' +
+                    '<td>' + (item.lane || '') + '</td>' +
+                    '<td>' + (item.side || '') + '</td>' +
+                    '<td>' + (item.machine || '') + '</td>' +
+                    '<td>' + (item.feeder || '') + '</td>' +
+                    '<td class="fw-bold">' + (item.engineerName || '') + '</td>' +
+                    '<td class="text-wrap" style="max-width: 300px;">' + (item.actionTaken || '') + '</td>' +
+                    '<td class="text-center text-nowrap">' +
+                        '<button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="openRetryImproveModal(\'' + (item.partsName || '') + '\', \'' + (item.line || '') + '\', \'' + (item.lane || '') + '\', \'' + (item.side || '') + '\', \'' + (item.machine || '') + '\', \'' + (item.feeder || '') + '\', ' + item.id + ', \'' + (item.engineerName || '') + '\', \'' + (item.actionTaken || '').replace(/'/g, "\\'") + '\', \'' + isoDate + '\')"><i class="bi bi-pencil"></i> Sửa</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7" onclick="deleteRetryImprove(' + item.id + ')"><i class="bi bi-trash"></i> Xóa</button>' +
+                    '</td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        })
+        .catch(function(err) {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-danger">Lỗi khi tải nhật ký cải thiện.</td></tr>';
+        });
+};
+
+// Load ErrorImprove History
+window.loadErrorImproveHistory = function() {
+    var tbody = document.getElementById('errorImproveHistoryTable');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Đang tải dữ liệu...</td></tr>';
+    
+    fetch('/api/improve/error/list')
+        .then(function(r) { return r.json(); })
+        .then(function(list) {
+            if (!list || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">Chưa có nhật ký hành động cải thiện nào được lưu.</td></tr>';
+                return;
+            }
+            var html = '';
+            list.forEach(function(item) {
+                var dateStr = item.executionDate ? new Date(item.executionDate).toLocaleDateString('vi-VN') : '';
+                var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : '';
+                html += '<tr>' +
+                    '<td class="fw-bold text-success">' + dateStr + '</td>' +
+                    '<td class="fw-bold text-danger">' + (item.error || '') + '</td>' +
+                    '<td>' + (item.line || '') + '</td>' +
+                    '<td>' + (item.lane || '') + '</td>' +
+                    '<td>' + (item.side || '') + '</td>' +
+                    '<td>' + (item.machine || '') + '</td>' +
+                    '<td class="fw-bold">' + (item.engineerName || '') + '</td>' +
+                    '<td class="text-wrap" style="max-width: 300px;">' + (item.actionTaken || '') + '</td>' +
+                    '<td class="text-center text-nowrap">' +
+                        '<button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="openErrorImproveModal(\'' + (item.error || '') + '\', \'' + (item.line || '') + '\', \'' + (item.lane || '') + '\', \'' + (item.side || '') + '\', \'' + (item.machine || '') + '\', ' + item.id + ', \'' + (item.engineerName || '') + '\', \'' + (item.actionTaken || '').replace(/'/g, "\\'") + '\', \'' + isoDate + '\')"><i class="bi bi-pencil"></i> Sửa</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7" onclick="deleteErrorImprove(' + item.id + ')"><i class="bi bi-trash"></i> Xóa</button>' +
+                    '</td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        })
+        .catch(function(err) {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Lỗi khi tải nhật ký cải thiện.</td></tr>';
+        });
+};
+
+window.refreshImprovementLists = function() {
+    window.loadRetryImproveHistory();
+    window.loadErrorImproveHistory();
+};
+
+// RetryLog Improvement Modal Open & Save Logic
+window.openRetryImproveModal = function(partsName, line, lane, side, machine, feeder, id, engineerName, actionTaken, executionDate) {
+    var idEl = document.getElementById('retryImp_Id');
+    var partsNameEl = document.getElementById('retryImp_PartsName');
+    var lineEl = document.getElementById('retryImp_Line');
+    var laneEl = document.getElementById('retryImp_Lane');
+    var sideEl = document.getElementById('retryImp_Side');
+    var machineEl = document.getElementById('retryImp_Machine');
+    var feederEl = document.getElementById('retryImp_Feeder');
+    var engineerNameEl = document.getElementById('retryImp_EngineerName');
+    var actionTakenEl = document.getElementById('retryImp_ActionTaken');
+    var executionDateEl = document.getElementById('retryImp_ExecutionDate');
+
+    if (idEl) idEl.value = id || '0';
+    if (partsNameEl) partsNameEl.value = partsName || '';
+    if (lineEl) lineEl.value = line || '';
+    if (laneEl) laneEl.value = lane || '';
+    if (sideEl) sideEl.value = side || '';
+    if (machineEl) machineEl.value = machine || '';
+    if (feederEl) feederEl.value = feeder || '';
+    if (engineerNameEl) engineerNameEl.value = engineerName || '';
+    if (actionTakenEl) actionTakenEl.value = actionTaken || '';
+    if (executionDateEl) {
+        if (executionDate) {
+            executionDateEl.value = executionDate.substring(0, 10);
+        } else {
+            executionDateEl.value = new Date().toISOString().substring(0, 10);
+        }
+    }
+    
+    var modalEl = document.getElementById('retryImproveModal');
+    if (modalEl) {
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+};
+
+window.submitRetryImproveForm = function() {
+    var id = parseInt(document.getElementById('retryImp_Id')?.value || '0', 10);
+    var partsName = document.getElementById('retryImp_PartsName')?.value || '';
+    var line = document.getElementById('retryImp_Line')?.value || '';
+    var lane = document.getElementById('retryImp_Lane')?.value || '';
+    var side = document.getElementById('retryImp_Side')?.value || '';
+    var machine = document.getElementById('retryImp_Machine')?.value || '';
+    var feeder = document.getElementById('retryImp_Feeder')?.value || '';
+    var engineerName = document.getElementById('retryImp_EngineerName')?.value || '';
+    var actionTaken = document.getElementById('retryImp_ActionTaken')?.value || '';
+    var executionDate = document.getElementById('retryImp_ExecutionDate')?.value || '';
+
+    if (!engineerName.trim() || !actionTaken.trim() || !executionDate) {
+        alert('Vui lòng điền đầy đủ các thông tin bắt buộc (*)');
+        return;
+    }
+
+    var data = {
+        partsName: partsName,
+        line: line,
+        lane: lane,
+        side: side,
+        machine: machine,
+        feeder: feeder,
+        engineerName: engineerName,
+        actionTaken: actionTaken,
+        executionDate: executionDate
+    };
+
+    var url = id > 0 ? ('/api/improve/retry/' + id) : '/api/improve/retry';
+    var method = id > 0 ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (res.success) {
+            alert(res.message);
+            var modalEl = document.getElementById('retryImproveModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            window.location.reload();
+        } else {
+            alert('Lỗi: ' + (res.message || 'Không thể lưu.'));
+        }
+    })
+    .catch(function (err) {
+        console.error(err);
+        alert('Lỗi kết nối máy chủ!');
+    });
+};
+
+window.deleteRetryImprove = function(id) {
+    if (!confirm('Bạn có chắc chắn muốn xóa nhật ký hành động cải thiện này không?')) {
+        return;
+    }
+    fetch('/api/improve/retry/' + id, {
+        method: 'DELETE'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res.success) {
+            alert(res.message);
+            window.location.reload();
+        } else {
+            alert('Lỗi: ' + (res.message || 'Không thể xóa.'));
+        }
+    })
+    .catch(function(err) {
+        console.error(err);
+        alert('Lỗi kết nối máy chủ!');
+    });
+};
+
+// ErrorLog Improvement Modal Open & Save Logic
+window.openErrorImproveModal = function(error, line, lane, side, machine, id, engineerName, actionTaken, executionDate) {
+    var idEl = document.getElementById('errorImp_Id');
+    var errorEl = document.getElementById('errorImp_Error');
+    var lineEl = document.getElementById('errorImp_Line');
+    var laneEl = document.getElementById('errorImp_Lane');
+    var sideEl = document.getElementById('errorImp_Side');
+    var machineEl = document.getElementById('errorImp_Machine');
+    var engineerNameEl = document.getElementById('errorImp_EngineerName');
+    var actionTakenEl = document.getElementById('errorImp_ActionTaken');
+    var executionDateEl = document.getElementById('errorImp_ExecutionDate');
+
+    if (idEl) idEl.value = id || '0';
+    if (errorEl) errorEl.value = error || '';
+    if (lineEl) lineEl.value = line || '';
+    if (laneEl) laneEl.value = lane || '';
+    if (sideEl) sideEl.value = side || '';
+    if (machineEl) machineEl.value = machine || '';
+    if (engineerNameEl) engineerNameEl.value = engineerName || '';
+    if (actionTakenEl) actionTakenEl.value = actionTaken || '';
+    if (executionDateEl) {
+        if (executionDate) {
+            executionDateEl.value = executionDate.substring(0, 10);
+        } else {
+            executionDateEl.value = new Date().toISOString().substring(0, 10);
+        }
+    }
+    
+    var modalEl = document.getElementById('errorImproveModal');
+    if (modalEl) {
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+};
+
+window.submitErrorImproveForm = function() {
+    var id = parseInt(document.getElementById('errorImp_Id')?.value || '0', 10);
+    var error = document.getElementById('errorImp_Error')?.value || '';
+    var line = document.getElementById('errorImp_Line')?.value || '';
+    var lane = document.getElementById('errorImp_Lane')?.value || '';
+    var side = document.getElementById('errorImp_Side')?.value || '';
+    var machine = document.getElementById('errorImp_Machine')?.value || '';
+    var engineerName = document.getElementById('errorImp_EngineerName')?.value || '';
+    var actionTaken = document.getElementById('errorImp_ActionTaken')?.value || '';
+    var executionDate = document.getElementById('errorImp_ExecutionDate')?.value || '';
+
+    if (!engineerName.trim() || !actionTaken.trim() || !executionDate) {
+        alert('Vui lòng điền đầy đủ các thông tin bắt buộc (*)');
+        return;
+    }
+
+    var data = {
+        error: error,
+        line: line,
+        lane: lane,
+        side: side,
+        machine: machine,
+        engineerName: engineerName,
+        actionTaken: actionTaken,
+        executionDate: executionDate
+    };
+
+    var url = id > 0 ? ('/api/improve/error/' + id) : '/api/improve/error';
+    var method = id > 0 ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (res.success) {
+            alert(res.message);
+            var modalEl = document.getElementById('errorImproveModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            window.location.reload();
+        } else {
+            alert('Lỗi: ' + (res.message || 'Không thể lưu.'));
+        }
+    })
+    .catch(function (err) {
+        console.error(err);
+        alert('Lỗi kết nối máy chủ!');
+    });
+};
+
+window.deleteErrorImprove = function(id) {
+    if (!confirm('Bạn có chắc chắn muốn xóa nhật ký hành động cải thiện này không?')) {
+        return;
+    }
+    fetch('/api/improve/error/' + id, {
+        method: 'DELETE'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res.success) {
+            alert(res.message);
+            window.location.reload();
+        } else {
+            alert('Lỗi: ' + (res.message || 'Không thể xóa.'));
+        }
+    })
+    .catch(function(err) {
+        console.error(err);
+        alert('Lỗi kết nối máy chủ!');
+    });
+};
+
+// Cumulative multi-file upload
 (function () {
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -108,5 +450,13 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         initCumulativeFileUpload('log-upload-input', 'log-upload-file-list', 'log-upload-form');
+        
+        // Auto-load history list if table placeholder is present
+        if (document.getElementById('retryImproveHistoryTable')) {
+            window.loadRetryImproveHistory();
+        }
+        if (document.getElementById('errorImproveHistoryTable')) {
+            window.loadErrorImproveHistory();
+        }
     });
 })();

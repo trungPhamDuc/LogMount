@@ -63,26 +63,54 @@ public class DashboardModel : PageModel
             SelectedMonth = await GetLatestMonthAsync(cancellationToken) ?? SelectedMonth;
         }
 
-        var dailyExpensivePartChart = await BuildExpensivePartChartAsync(SelectedDate, null, cancellationToken);
-        var monthlyExpensivePartChart = await BuildExpensivePartChartAsync(null, SelectedMonth, cancellationToken);
-        var dailyExpensivePartCostChart = await BuildExpensivePartCostChartAsync(SelectedDate, null, cancellationToken);
-        var monthlyExpensivePartCostChart = await BuildExpensivePartCostChartAsync(null, SelectedMonth, cancellationToken);
-        var dailyErrorChart = await BuildErrorChartAsync(SelectedDate, null, cancellationToken);
-        var monthlyErrorChart = await BuildErrorChartAsync(null, SelectedMonth, cancellationToken);
+    }
 
-        DailyExpensivePartErrorTotal = await GetExpensivePartErrorTotalAsync(SelectedDate, null, cancellationToken);
-        MonthlyExpensivePartErrorTotal = await GetExpensivePartErrorTotalAsync(null, SelectedMonth, cancellationToken);
-        DailyErrorTotal = await GetErrorTotalAsync(SelectedDate, null, cancellationToken);
-        MonthlyErrorTotal = await GetErrorTotalAsync(null, SelectedMonth, cancellationToken);
-        DailyExpensivePartCostTotal = await GetExpensivePartCostTotalAsync(SelectedDate, null, cancellationToken);
-        MonthlyExpensivePartCostTotal = await GetExpensivePartCostTotalAsync(null, SelectedMonth, cancellationToken);
+    public async Task<IActionResult> OnGetChartAsync(string chart, string? selectedDate, string? selectedMonth, int topN, CancellationToken cancellationToken)
+    {
+        TopN = TopNOptions.Contains(topN) ? topN : 10;
+        var date = NormalizeDate(selectedDate) ?? DateTime.Today.ToString("yyyy/MM/dd");
+        var month = NormalizeMonth(selectedMonth) ?? DateTime.Today.ToString("yyyy/MM");
+        IReadOnlyList<DashboardChartItem> data;
+        decimal total;
+        string unit;
 
-        ExpensivePartDayChartJson = JsonSerializer.Serialize(dailyExpensivePartChart, ChartJsonOptions);
-        ExpensivePartMonthChartJson = JsonSerializer.Serialize(monthlyExpensivePartChart, ChartJsonOptions);
-        ExpensivePartDayCostChartJson = JsonSerializer.Serialize(dailyExpensivePartCostChart, ChartJsonOptions);
-        ExpensivePartMonthCostChartJson = JsonSerializer.Serialize(monthlyExpensivePartCostChart, ChartJsonOptions);
-        DailyErrorChartJson = JsonSerializer.Serialize(dailyErrorChart, ChartJsonOptions);
-        MonthlyErrorChartJson = JsonSerializer.Serialize(monthlyErrorChart, ChartJsonOptions);
+        switch (chart)
+        {
+            case "daily-error":
+                data = await BuildErrorChartAsync(date, null, cancellationToken);
+                total = await GetErrorTotalAsync(date, null, cancellationToken);
+                unit = "lỗi";
+                break;
+            case "daily-parts":
+                data = await BuildExpensivePartChartAsync(date, null, cancellationToken);
+                total = await GetExpensivePartErrorTotalAsync(date, null, cancellationToken);
+                unit = "lỗi";
+                break;
+            case "daily-cost":
+                data = await BuildExpensivePartCostChartAsync(date, null, cancellationToken);
+                total = await GetExpensivePartCostTotalAsync(date, null, cancellationToken);
+                unit = "đồng";
+                break;
+            case "monthly-error":
+                data = await BuildErrorChartAsync(null, month, cancellationToken);
+                total = await GetErrorTotalAsync(null, month, cancellationToken);
+                unit = "lỗi";
+                break;
+            case "monthly-parts":
+                data = await BuildExpensivePartChartAsync(null, month, cancellationToken);
+                total = await GetExpensivePartErrorTotalAsync(null, month, cancellationToken);
+                unit = "lỗi";
+                break;
+            case "monthly-cost":
+                data = await BuildExpensivePartCostChartAsync(null, month, cancellationToken);
+                total = await GetExpensivePartCostTotalAsync(null, month, cancellationToken);
+                unit = "đồng";
+                break;
+            default:
+                return BadRequest("Biểu đồ không hợp lệ.");
+        }
+
+        return new JsonResult(new { data, total, unit }, ChartJsonOptions);
     }
 
     private async Task<IReadOnlyList<DashboardChartItem>> BuildExpensivePartChartAsync(

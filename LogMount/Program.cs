@@ -3,6 +3,8 @@ using LogMount.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using LogMount.Models;
 
 const long maxUploadBytes = 500L * 1024 * 1024;
 
@@ -26,11 +28,29 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AddPageRoute("/Dashboard", "");
+    options.Conventions.ConfigureFilter(new StaffOnlyPageFilter());
 });
 builder.Services.AddDbContext<LogMountDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         sqlServerOptions => sqlServerOptions.CommandTimeout(120)));
+builder.Services.AddControllers();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Login";
+        options.AccessDeniedPath = "/Login?denied=true";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -56,6 +76,19 @@ builder.Services.AddHostedService<BatchInfrastructureInitializer>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<LogMountDbContext>();
+    await db.Database.MigrateAsync();
+    if (!await db.UserAccounts.AnyAsync())
+    {
+        var admin = new UserAccount { Username = "admin", FullName = "System Administrator", Department = "IT", EmployeeId = "ADMIN", Role = UserRoles.Admin };
+        admin.PasswordHash = new Microsoft.AspNetCore.Identity.PasswordHasher<UserAccount>().HashPassword(admin, "Admin@123");
+        db.UserAccounts.Add(admin);
+        await db.SaveChangesAsync();
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -70,8 +103,10 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseSession();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapControllers();
 
 app.Run();

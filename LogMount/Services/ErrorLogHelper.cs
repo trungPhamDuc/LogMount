@@ -11,6 +11,14 @@ public static class ErrorLogHelper
     {
         if (!string.IsNullOrWhiteSpace(line))
         {
+            var trimmed = line.Trim();
+            if (trimmed.Equals("L0", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("Line 0", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("Line LTE", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("LINELTE", StringComparison.OrdinalIgnoreCase))
+            {
+                return "LLTE";
+            }
             return line;
         }
 
@@ -19,21 +27,25 @@ public static class ErrorLogHelper
             return null;
         }
 
+        if (programName.Contains("LTE", StringComparison.OrdinalIgnoreCase))
+        {
+            return "LLTE";
+        }
+
         var match = LineNumPattern.Match(programName);
         if (match.Success)
         {
-            return $"Line {match.Groups["line"].Value}";
-        }
-
-        if (programName.Contains("LTE", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Line LTE";
+            var num = match.Groups["line"].Value;
+            if (num == "0") return "LLTE";
+            return $"Line {num}";
         }
 
         var lineWordMatch = LineWordPattern.Match(programName);
         if (lineWordMatch.Success)
         {
-            return $"Line {lineWordMatch.Groups["line"].Value}";
+            var num = lineWordMatch.Groups["line"].Value;
+            if (num == "0") return "LLTE";
+            return $"Line {num}";
         }
 
         return null;

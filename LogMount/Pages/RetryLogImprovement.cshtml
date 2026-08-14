@@ -1,0 +1,578 @@
+@page "/RetryLogImprovement"
+@model RetryLogImprovementModel
+@{
+    ViewData["Title"] = "Cải thiện RetryLog";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h1 class="h2 mb-1">Cải thiện RetryLog</h1>
+                <p class="text-muted mb-0">Phân tích xu hướng retries theo Ngày, xu hướng Linh kiện đắt tiền (LKDT) hoặc xem Nhật ký cải thiện đã thực hiện.</p>
+            </div>
+            @if (Model.IsFilterApplied)
+            {
+                <span class="badge bg-primary fs-6 px-3 py-2">
+                    Tổng: @Model.FilteredRetries.ToString("N0") lần retries
+                </span>
+            }
+        </div>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h2 class="h5 card-title mb-0">
+                <i class="bi bi-funnel"></i> Bộ lọc dữ liệu Cải thiện RetryLog
+            </h2>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label asp-for="Filter.FromDate" class="form-label fw-semibold">Từ ngày</label>
+                    <input asp-for="Filter.FromDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Filter.ToDate" class="form-label fw-semibold">Đến ngày</label>
+                    <input asp-for="Filter.ToDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Filter.Line" class="form-label fw-semibold">Line</label>
+                    <input asp-for="Filter.Line" class="form-control" placeholder="VD: L1" list="linesList" />
+                    <datalist id="linesList">
+                        @foreach (var opt in Model.AvailableLines)
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Filter.Lane" class="form-label fw-semibold">Lane</label>
+                    <input asp-for="Filter.Lane" class="form-control" placeholder="VD: 1" list="lanesList" />
+                    <datalist id="lanesList">
+                        @foreach (var opt in Model.AvailableLanes)
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Filter.Side" class="form-label fw-semibold">Mặt</label>
+                    <select asp-for="Filter.Side" class="form-select">
+                        <option value="">-- Tất cả --</option>
+                        <option value="BOT">BOT (B)</option>
+                        <option value="TOP">TOP (T)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label asp-for="Filter.Machine" class="form-label fw-semibold">Máy</label>
+                    <input asp-for="Filter.Machine" class="form-control" placeholder="VD: A" list="machinesList" />
+                    <datalist id="machinesList">
+                        @foreach (var opt in Model.AvailableMachines)
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Filter.Table" class="form-label fw-semibold">Table</label>
+                    <input asp-for="Filter.Table" class="form-control" placeholder="VD: T1" list="tablesList" />
+                    <datalist id="tablesList">
+                        @foreach (var opt in Model.AvailableTables)
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Filter.PartsName" class="form-label fw-semibold text-primary">Parts Name</label>
+                    <input asp-for="Filter.PartsName" class="form-control border-primary" placeholder="VD: Capacitor 100NF..." list="partsList" />
+                    <datalist id="partsList">
+                        @foreach (var opt in Model.AvailablePartsNames.Take(100))
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Filter.ErrorName" class="form-label fw-semibold">Error Name</label>
+                    <input asp-for="Filter.ErrorName" class="form-control" placeholder="Tên lỗi..." list="errorNamesList" />
+                    <datalist id="errorNamesList">
+                        @foreach (var opt in Model.AvailableErrorNames.Take(100))
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Filter.ErrorNo" class="form-label fw-semibold">Error No</label>
+                    <input asp-for="Filter.ErrorNo" class="form-control" placeholder="Mã lỗi..." list="errorNosList" />
+                    <datalist id="errorNosList">
+                        @foreach (var opt in Model.AvailableErrorNos.Take(100))
+                        {
+                            <option value="@opt"></option>
+                        }
+                    </datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label asp-for="Filter.TopN" class="form-label fw-semibold">Hiển thị linh kiện</label>
+                    <select asp-for="Filter.TopN" class="form-select">
+                        <option value="5">Top 5</option>
+                        <option value="10">Top 10</option>
+                        <option value="20" selected>Top 20</option>
+                        <option value="50">Top 50</option>
+                        <option value="0">Tất cả</option>
+                    </select>
+                </div>
+
+                <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary px-4">
+                        Cập nhật biểu đồ
+                    </button>
+                    <a asp-page="/RetryLogImprovement" class="btn btn-outline-secondary">Xóa bộ lọc</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chart & Table Tabs Container -->
+    @if (!Model.IsFilterApplied)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="alert alert-info text-center py-5 mb-0">
+                    <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+                    <strong>Vui lòng chọn các điều kiện lọc bên trên và nhấn "Cập nhật biểu đồ" để hiển thị biểu đồ và nhật ký cải thiện.</strong>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Mode Tabs Switcher -->
+        <ul class="nav nav-tabs nav-fill mb-3" id="viewTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fs-5 fw-bold py-3" id="daily-tab" data-bs-toggle="tab" data-bs-target="#daily-pane" type="button" role="tab">
+                    <i class="bi bi-calendar-range me-2 text-primary"></i> 1. Xem xu hướng theo Ngày (Tăng / Giảm)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fs-5 fw-bold py-3" id="exp-daily-tab" data-bs-toggle="tab" data-bs-target="#exp-daily-pane" type="button" role="tab">
+                    <i class="bi bi-gem me-2 text-warning"></i> 2. Xem xu hướng LKDT theo ngày
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fs-5 fw-bold py-3" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
+                    <i class="bi bi-clock-history me-2 text-success"></i> 3. Nhật ký Cải thiện (RetryImprove)
+                    @if (Model.ImprovementHistoryItems.Count > 0)
+                    {
+                        <span class="badge bg-success ms-1">@Model.ImprovementHistoryItems.Count</span>
+                    }
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="viewTabsContent">
+            <!-- TAB 1: DAILY TREND (Theo ngày) -->
+            <div class="tab-pane fade show active" id="daily-pane" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <h2 class="h5 card-title mb-0 text-primary fw-bold fs-4">
+                                Biểu đồ theo dõi retries qua các ngày (Xem xu hướng Tăng / Giảm)
+                            </h2>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="downloadChartAsImage('retryDailyChart', 'Bieudo_RetryLog_TheoNgay.png')">
+                                <i class="bi bi-camera-fill me-1"></i> Tải biểu đồ (PNG)
+                            </button>
+                        </div>
+                        <div style="position: relative; width: 100%; height: 480px;">
+                            <canvas id="retryDailyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Breakdown Table -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h2 class="h5 card-title mb-0">
+                            Thống kê chi tiết số lần retries theo từng ngày
+                        </h2>
+                        <span class="text-muted small">@Model.DailyItems.Count ngày</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="width: 50px;" class="text-center">#</th>
+                                        <th>Ngày</th>
+                                        <th class="text-end">Số lần retries</th>
+                                        <th class="text-end">Tỷ lệ %</th>
+                                        <th class="text-center">Xu hướng so với ngày trước</th>
+                                        <th>Linh kiện retries nhiều nhất trong ngày</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.DailyItems)
+                                    {
+                                        <tr>
+                                            <td class="text-center fw-bold">@item.Rank</td>
+                                            <td class="fw-bold text-primary">@item.Date</td>
+                                            <td class="text-end fw-bold text-danger fs-6">@item.Count.ToString("N0")</td>
+                                            <td class="text-end fw-semibold text-primary">@item.Percentage.ToString("0.0")%</td>
+                                            <td class="text-center">
+                                                @if (item.TrendIndicator.Contains("Tăng"))
+                                                {
+                                                    <span class="badge bg-danger"><i class="bi bi-arrow-up-right"></i> @item.TrendIndicator</span>
+                                                }
+                                                else if (item.TrendIndicator.Contains("Giảm"))
+                                                {
+                                                    <span class="badge bg-success"><i class="bi bi-arrow-down-right"></i> @item.TrendIndicator</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">@item.TrendIndicator</span>
+                                                }
+                                            </td>
+                                            <td class="text-muted small">@item.TopPartsOrErrors</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary fw-bold">
+                                        <td colspan="2" class="text-end">Tổng cộng:</td>
+                                        <td class="text-end text-danger">@Model.FilteredRetries.ToString("N0")</td>
+                                        <td class="text-end text-primary">100.0%</td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: EXPENSIVE PARTS DAILY TREND (Xu hướng LKDT theo ngày) -->
+            <div class="tab-pane fade" id="exp-daily-pane" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <h2 class="h5 card-title mb-0 text-warning fw-bold fs-4">
+                                Biểu đồ theo dõi retries Linh Kiện Đắt Tiền (LKDT) qua các ngày
+                            </h2>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="downloadChartAsImage('retryExpensiveDailyChart', 'Bieudo_RetryLog_LKDT_TheoNgay.png')">
+                                <i class="bi bi-camera-fill me-1"></i> Tải biểu đồ (PNG)
+                            </button>
+                        </div>
+                        <div style="position: relative; width: 100%; height: 480px;">
+                            <canvas id="retryExpensiveDailyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expensive Parts Daily Breakdown Table -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h2 class="h5 card-title mb-0">
+                            Thống kê chi tiết retries Linh Kiện Đắt Tiền (LKDT) theo từng ngày
+                        </h2>
+                        <span class="text-muted small">@Model.ExpensiveDailyItems.Count ngày</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="width: 50px;" class="text-center">#</th>
+                                        <th>Ngày</th>
+                                        <th class="text-end">Số lần retries LKDT</th>
+                                        <th class="text-end">Tỷ lệ %</th>
+                                        <th class="text-center">Xu hướng so với ngày trước</th>
+                                        <th>LKDT retries nhiều nhất trong ngày</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (Model.ExpensiveDailyItems.Count == 0)
+                                    {
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4 text-muted">
+                                                Không có dữ liệu retries cho Linh Kiện Đắt Tiền trong điều kiện lọc đã chọn.
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in Model.ExpensiveDailyItems)
+                                        {
+                                            <tr>
+                                                <td class="text-center fw-bold">@item.Rank</td>
+                                                <td class="fw-bold text-primary">@item.Date</td>
+                                                <td class="text-end fw-bold text-danger fs-6">@item.Count.ToString("N0")</td>
+                                                <td class="text-end fw-semibold text-primary">@item.Percentage.ToString("0.0")%</td>
+                                                <td class="text-center">
+                                                    @if (item.TrendIndicator.Contains("Tăng"))
+                                                    {
+                                                        <span class="badge bg-danger"><i class="bi bi-arrow-up-right"></i> @item.TrendIndicator</span>
+                                                    }
+                                                    else if (item.TrendIndicator.Contains("Giảm"))
+                                                    {
+                                                        <span class="badge bg-success"><i class="bi bi-arrow-down-right"></i> @item.TrendIndicator</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">@item.TrendIndicator</span>
+                                                    }
+                                                </td>
+                                                <td class="text-muted small">@item.TopPartsOrErrors</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary fw-bold">
+                                        <td colspan="2" class="text-end">Tổng cộng LKDT:</td>
+                                        <td class="text-end text-danger">@Model.FilteredExpensiveRetries.ToString("N0")</td>
+                                        <td class="text-end text-primary">100.0%</td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: RETRY IMPROVE HISTORY (Lịch sử cải thiện theo đúng bộ lọc) -->
+            <div class="tab-pane fade" id="history-pane" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="h5 card-title mb-1 fw-bold text-success">
+                                <i class="bi bi-journal-check me-2"></i> Nhật ký Hành động Cải thiện (RetryImprove)
+                            </h2>
+                            <div class="text-muted small">
+                                Đã lọc theo khoảng thời gian từ @(Model.Filter.FromDate ?? "...") đến @(Model.Filter.ToDate ?? "...")
+                                @if (!string.IsNullOrWhiteSpace(Model.Filter.PartsName)) { <span>| Parts Name: @Model.Filter.PartsName</span> }
+                                @if (!string.IsNullOrWhiteSpace(Model.Filter.Line)) { <span>| Line: @Model.Filter.Line</span> }
+                            </div>
+                        </div>
+                        <span class="badge bg-success fs-6">@Model.ImprovementHistoryItems.Count bản ghi</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Ngày thực hiện</th>
+                                        <th>Linh kiện (Parts Name)</th>
+                                        <th>Line</th>
+                                        <th>Lane</th>
+                                        <th>Mặt</th>
+                                        <th>Máy</th>
+                                        <th>Feeder</th>
+                                        <th>Kỹ sư thực hiện</th>
+                                        <th>Hành động cải thiện</th>
+                                        <th class="text-center">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (Model.ImprovementHistoryItems.Count == 0)
+                                    {
+                                        <tr>
+                                            <td colspan="10" class="text-center py-4 text-muted">
+                                                Không có nhật ký hành động cải thiện nào phù hợp với khoảng thời gian và điều kiện lọc đã chọn.
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in Model.ImprovementHistoryItems)
+                                        {
+                                            var isoDate = item.ExecutionDate.ToString("yyyy-MM-dd");
+                                            var safeAction = (item.ActionTaken ?? "").Replace("'", "\\'");
+                                            <tr>
+                                                <td class="fw-bold text-success">@item.ExecutionDate.ToString("dd/MM/yyyy")</td>
+                                                <td class="fw-bold text-primary">@item.PartsName</td>
+                                                <td>@item.Line</td>
+                                                <td>@item.Lane</td>
+                                                <td>@item.Side</td>
+                                                <td>@item.Machine</td>
+                                                <td>@item.Feeder</td>
+                                                <td class="fw-bold text-dark">@item.EngineerName</td>
+                                                <td class="text-wrap" style="max-width: 300px;">@item.ActionTaken</td>
+                                                <td class="text-center text-nowrap">
+                                                    <button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="openRetryImproveModal('@item.PartsName', '@item.Line', '@item.Lane', '@item.Side', '@item.Machine', '@item.Feeder', @item.Id, '@item.EngineerName', '@safeAction', '@isoDate')">
+                                                        <i class="bi bi-pencil"></i> Sửa
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7" onclick="deleteRetryImprove(@item.Id)">
+                                                        <i class="bi bi-trash"></i> Xóa
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    @if (Model.IsFilterApplied && Model.FilteredRetries > 0)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            (function () {
+                var customDatalabelsPlugin = {
+                    id: 'customDatalabelsPlugin',
+                    afterDatasetsDraw: function (chart) {
+                        var ctx = chart.ctx;
+                        chart.data.datasets.forEach(function (dataset, datasetIndex) {
+                            var meta = chart.getDatasetMeta(datasetIndex);
+                            if (meta.hidden) return;
+
+                            meta.data.forEach(function (element, index) {
+                                var val = dataset.data[index];
+                                if (val === null || val === undefined) return;
+
+                                ctx.save();
+                                ctx.font = 'bold 11px sans-serif';
+                                ctx.textAlign = 'center';
+
+                                if (dataset.yAxisID === 'y1') {
+                                    ctx.fillStyle = '#dc2626';
+                                    ctx.textBaseline = 'bottom';
+                                    ctx.fillText(val.toFixed(1) + '%', element.x, element.y - 8);
+                                } else {
+                                    ctx.fillStyle = '#1e3a8a';
+                                    ctx.textBaseline = 'bottom';
+                                    ctx.fillText(Number(val).toLocaleString(), element.x, element.y - 4);
+                                }
+                                ctx.restore();
+                            });
+                        });
+                    }
+                };
+
+                // 1. Render Daily Chart (Tab 1)
+                var dailyCanvas = document.getElementById('retryDailyChart');
+                if (dailyCanvas) {
+                    var rawDaily = @Html.Raw(Model.ChartDailyJson);
+                    if (rawDaily && rawDaily.length) {
+                        var dLabels = rawDaily.map(function (i) { return i.name; });
+                        var dCounts = rawDaily.map(function (i) { return i.count; });
+                        var dPcts = rawDaily.map(function (i) { return i.percentage; });
+
+                        new Chart(dailyCanvas, {
+                            type: 'bar',
+                            data: {
+                                labels: dLabels,
+                                datasets: [
+                                    {
+                                        type: 'bar',
+                                        label: 'Số lần retries trong ngày',
+                                        data: dCounts,
+                                        backgroundColor: 'rgba(37, 99, 235, 0.85)',
+                                        borderColor: '#1d4ed8',
+                                        borderWidth: 1,
+                                        borderRadius: 4,
+                                        yAxisID: 'y',
+                                        order: 2
+                                    },
+                                    {
+                                        type: 'line',
+                                        label: 'Tỷ lệ % trong ngày',
+                                        data: dPcts,
+                                        borderColor: '#dc2626',
+                                        backgroundColor: '#dc2626',
+                                        borderWidth: 2,
+                                        pointStyle: 'rect',
+                                        pointRadius: 6,
+                                        yAxisID: 'y1',
+                                        order: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                animation: false,
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                layout: { padding: { top: 25, right: 10, bottom: 10, left: 10 } },
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 11 } } },
+                                    y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Số lần' }, beginAtZero: true },
+                                    y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: '%' }, beginAtZero: true, min: 0, max: Math.max(100, Math.ceil(Math.max.apply(null, dPcts) * 1.25)), grid: { drawOnChartArea: false } }
+                                }
+                            },
+                            plugins: [customDatalabelsPlugin]
+                        });
+                    }
+                }
+
+                // 2. Render Expensive Parts Daily Chart (Tab 2)
+                var expDailyCanvas = document.getElementById('retryExpensiveDailyChart');
+                if (expDailyCanvas) {
+                    var rawExpDaily = @Html.Raw(Model.ChartExpensiveDailyJson);
+                    if (rawExpDaily && rawExpDaily.length) {
+                        var eLabels = rawExpDaily.map(function (i) { return i.name; });
+                        var eCounts = rawExpDaily.map(function (i) { return i.count; });
+                        var ePcts = rawExpDaily.map(function (i) { return i.percentage; });
+
+                        new Chart(expDailyCanvas, {
+                            type: 'bar',
+                            data: {
+                                labels: eLabels,
+                                datasets: [
+                                    {
+                                        type: 'bar',
+                                        label: 'Số lần retries LKDT trong ngày',
+                                        data: eCounts,
+                                        backgroundColor: 'rgba(217, 119, 6, 0.85)',
+                                        borderColor: '#b45309',
+                                        borderWidth: 1,
+                                        borderRadius: 4,
+                                        yAxisID: 'y',
+                                        order: 2
+                                    },
+                                    {
+                                        type: 'line',
+                                        label: 'Tỷ lệ % trong ngày',
+                                        data: ePcts,
+                                        borderColor: '#dc2626',
+                                        backgroundColor: '#dc2626',
+                                        borderWidth: 2,
+                                        pointStyle: 'rect',
+                                        pointRadius: 6,
+                                        yAxisID: 'y1',
+                                        order: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                animation: false,
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                layout: { padding: { top: 25, right: 10, bottom: 10, left: 10 } },
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 11 } } },
+                                    y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Số lần' }, beginAtZero: true },
+                                    y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: '%' }, beginAtZero: true, min: 0, max: Math.max(100, Math.ceil(Math.max.apply(null, ePcts) * 1.25)), grid: { drawOnChartArea: false } }
+                                }
+                            },
+                            plugins: [customDatalabelsPlugin]
+                        });
+                    }
+                }
+            })();
+        </script>
+    }
+}

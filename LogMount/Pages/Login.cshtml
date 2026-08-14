@@ -1,0 +1,32 @@
+@page
+@model LoginModel
+@{
+    ViewData["Title"] = "Đăng nhập";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập - LogMount</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+</head>
+<body class="bg-light">
+    <main class="container d-flex align-items-center min-vh-100">
+        <section class="card shadow-sm mx-auto" style="width: 100%; max-width: 420px;">
+            <div class="card-body p-4">
+                <h1 class="h3 text-center mb-4">LogMount</h1>
+                @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                { <div class="alert alert-danger">@Model.ErrorMessage</div> }
+                <form method="post">
+                    <input type="hidden" asp-for="ReturnUrl" />
+                    <div class="mb-3"><label asp-for="Username" class="form-label">Tên đăng nhập</label><input asp-for="Username" class="form-control" autocomplete="username" required autofocus /></div>
+                    <div class="mb-4"><label asp-for="Password" class="form-label">Mật khẩu</label><input asp-for="Password" type="password" class="form-control" autocomplete="current-password" required /></div>
+                    <button class="btn btn-primary w-100" type="submit">Đăng nhập</button>
+                </form>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

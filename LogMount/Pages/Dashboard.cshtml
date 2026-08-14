@@ -38,14 +38,24 @@
 
     <div class="row g-4">
         <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
+            <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="daily-error">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Tổng hợp lỗi ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.DailyErrorTotal.ToString("N0") lỗi</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('dailyErrorChart', 'Tong_Hop_Loi_Ngay_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('dailyErrorBarChart', 'Tong_Hop_Loi_Ngay_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge" id="dailyErrorTotal">Đang tải...</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -72,14 +82,24 @@
         </div>
 
         <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
+            <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="daily-parts">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Lỗi linh kiện đắt tiền ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.DailyExpensivePartErrorTotal.ToString("N0") lỗi</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('expensivePartDayChart', 'Loi_LinhKien_DatTien_Ngay_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('expensivePartDayBarChart', 'Loi_LinhKien_DatTien_Ngay_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge" id="dailyPartsTotal">Đang tải...</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -106,14 +126,24 @@
         </div>
 
         <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
+            <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="daily-cost">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.DailyExpensivePartCostTotal.ToString("N0") đồng</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('expensivePartDayCostChart', 'GiaTien_LinhKien_DatTien_Ngay_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('expensivePartDayCostBarChart', 'GiaTien_LinhKien_DatTien_Ngay_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge" id="dailyCostTotal">Đang tải...</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -140,14 +170,24 @@
         </div>
 
         <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
+            <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="monthly-cost">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Số tiền linh kiện đắt tiền tháng</h2>
                             <div class="text-muted small">@Model.SelectedMonth</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.MonthlyExpensivePartCostTotal.ToString("N0") đồng</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('expensivePartMonthCostChart', 'GiaTien_LinhKien_DatTien_Thang_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('expensivePartMonthCostBarChart', 'GiaTien_LinhKien_DatTien_Thang_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge" id="monthlyCostTotal">Đang tải...</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -174,14 +214,24 @@
         </div>
 
         <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
+            <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="monthly-error">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Tổng hợp lỗi tháng</h2>
                             <div class="text-muted small">@Model.SelectedMonth</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.MonthlyErrorTotal.ToString("N0") lỗi</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('monthlyErrorChart', 'Tong_Hop_Loi_Thang_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('monthlyErrorBarChart', 'Tong_Hop_Loi_Thang_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge" id="monthlyErrorTotal">Đang tải...</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -208,14 +258,24 @@
         </div>
 
         <div class="col-xl-6">
-            <div class="card shadow-sm h-100 dashboard-chart-card">
+            <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="monthly-parts">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
                             <h2 class="h5 card-title mb-1">Lỗi linh kiện đắt tiền tháng</h2>
                             <div class="text-muted small">@Model.SelectedMonth</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.MonthlyExpensivePartErrorTotal.ToString("N0") lỗi</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('expensivePartMonthChart', 'Loi_LinhKien_DatTien_Thang_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('expensivePartMonthBarChart', 'Loi_LinhKien_DatTien_Thang_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge" id="monthlyPartsTotal">Đang tải...</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -489,12 +549,50 @@
                 });
             }
 
-            renderDashboardBlock('dailyErrorChart', 'dailyErrorBarChart', 'dailyErrorTable', @Html.Raw(Model.DailyErrorChartJson), buildDayErrorUrl, 'lỗi');
-            renderDashboardBlock('expensivePartDayChart', 'expensivePartDayBarChart', 'expensivePartDayTable', @Html.Raw(Model.ExpensivePartDayChartJson), buildDayPartUrl, 'lỗi');
-            renderDashboardBlock('expensivePartDayCostChart', 'expensivePartDayCostBarChart', 'expensivePartDayCostTable', @Html.Raw(Model.ExpensivePartDayCostChartJson), buildDayPartUrl, 'đồng');
-            renderDashboardBlock('monthlyErrorChart', 'monthlyErrorBarChart', 'monthlyErrorTable', @Html.Raw(Model.MonthlyErrorChartJson), buildMonthErrorUrl, 'lỗi');
-            renderDashboardBlock('expensivePartMonthChart', 'expensivePartMonthBarChart', 'expensivePartMonthTable', @Html.Raw(Model.ExpensivePartMonthChartJson), buildMonthPartUrl, 'lỗi');
-            renderDashboardBlock('expensivePartMonthCostChart', 'expensivePartMonthCostBarChart', 'expensivePartMonthCostTable', @Html.Raw(Model.ExpensivePartMonthCostChartJson), buildMonthPartUrl, 'đồng');
+            var chartEndpoint = '@Url.Page("/Dashboard", "Chart")';
+            var chartConfigurations = {
+                'daily-error': { doughnut: 'dailyErrorChart', bar: 'dailyErrorBarChart', table: 'dailyErrorTable', total: 'dailyErrorTotal', link: buildDayErrorUrl },
+                'daily-parts': { doughnut: 'expensivePartDayChart', bar: 'expensivePartDayBarChart', table: 'expensivePartDayTable', total: 'dailyPartsTotal', link: buildDayPartUrl },
+                'daily-cost': { doughnut: 'expensivePartDayCostChart', bar: 'expensivePartDayCostBarChart', table: 'expensivePartDayCostTable', total: 'dailyCostTotal', link: buildDayPartUrl },
+                'monthly-error': { doughnut: 'monthlyErrorChart', bar: 'monthlyErrorBarChart', table: 'monthlyErrorTable', total: 'monthlyErrorTotal', link: buildMonthErrorUrl },
+                'monthly-parts': { doughnut: 'expensivePartMonthChart', bar: 'expensivePartMonthBarChart', table: 'expensivePartMonthTable', total: 'monthlyPartsTotal', link: buildMonthPartUrl },
+                'monthly-cost': { doughnut: 'expensivePartMonthCostChart', bar: 'expensivePartMonthCostBarChart', table: 'expensivePartMonthCostTable', total: 'monthlyCostTotal', link: buildMonthPartUrl }
+            };
+
+            function loadDashboardChart(chartName) {
+                var config = chartConfigurations[chartName];
+                if (!config || config.loading) return;
+                config.loading = true;
+                var url = new URL(chartEndpoint, window.location.origin);
+                url.searchParams.set('chart', chartName);
+                url.searchParams.set('selectedDate', '@Model.SelectedDate');
+                url.searchParams.set('selectedMonth', '@Model.SelectedMonth');
+                url.searchParams.set('topN', '@Model.TopN');
+
+                fetch(url.toString(), { credentials: 'same-origin' })
+                    .then(function (response) { if (!response.ok) throw new Error(); return response.json(); })
+                    .then(function (result) {
+                        renderDashboardBlock(config.doughnut, config.bar, config.table, result.data, config.link, result.unit);
+                        document.getElementById(config.total).textContent = formatValue(result.total, result.unit) + ' ' + result.unit;
+                    })
+                    .catch(function () {
+                        document.getElementById(config.total).textContent = 'Không tải được';
+                        document.getElementById(config.table).innerHTML = '<tr><td colspan="3" class="text-danger text-center">Không thể tải biểu đồ.</td></tr>';
+                    });
+            }
+
+            // Load the first chart immediately; defer the rest until their cards are near the viewport.
+            loadDashboardChart('daily-error');
+            var chartObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (!entry.isIntersecting) return;
+                    loadDashboardChart(entry.target.dataset.dashboardChart);
+                    chartObserver.unobserve(entry.target);
+                });
+            }, { rootMargin: '250px 0px' });
+            document.querySelectorAll('[data-dashboard-chart]').forEach(function (card) {
+                if (card.dataset.dashboardChart !== 'daily-error') chartObserver.observe(card);
+            });
 
             function getNextDashboardReloadTime(now) {
                 var next = new Date(now);

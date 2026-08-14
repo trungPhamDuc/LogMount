@@ -45,7 +45,17 @@
                             <h2 class="h5 card-title mb-1">Tổng hợp ErrorLog ngày</h2>
                             <div class="text-muted small">@Model.SelectedDate</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.DailyErrorTotal.ToString("N0") lỗi</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('dailyErrorLogChart', 'Tong_Hop_ErrorLog_Ngay_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('dailyErrorLogBarChart', 'Tong_Hop_ErrorLog_Ngay_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge">@Model.DailyErrorTotal.ToString("N0") lỗi</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">
@@ -79,7 +89,17 @@
                             <h2 class="h5 card-title mb-1">Tổng hợp ErrorLog tháng</h2>
                             <div class="text-muted small">@Model.SelectedMonth</div>
                         </div>
-                        <span class="dashboard-total-badge">@Model.MonthlyErrorTotal.ToString("N0") lỗi</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ tròn (PNG)" onclick="downloadChartAsImage('monthlyErrorLogChart', 'Tong_Hop_ErrorLog_Thang_Tron.png')">
+                                    <i class="bi bi-pie-chart-fill"></i> Tròn
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Tải biểu đồ cột (PNG)" onclick="downloadChartAsImage('monthlyErrorLogBarChart', 'Tong_Hop_ErrorLog_Thang_Cot.png')">
+                                    <i class="bi bi-bar-chart-fill"></i> Cột
+                                </button>
+                            </div>
+                            <span class="dashboard-total-badge">@Model.MonthlyErrorTotal.ToString("N0") lỗi</span>
+                        </div>
                     </div>
                     <div class="dashboard-chart-grid">
                         <div class="dashboard-doughnut-wrapper">

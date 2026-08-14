@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -14,14 +14,18 @@
         var isDashboardPage = currentPage.Equals("/Dashboard", StringComparison.OrdinalIgnoreCase);
         var isAnalysisPage = currentPage.Equals("/Index", StringComparison.OrdinalIgnoreCase) ||
                              currentPage.Equals("/ExpensiveParts", StringComparison.OrdinalIgnoreCase);
+        var isRetryLogImprovementPage = currentPage.Equals("/RetryLogImprovement", StringComparison.OrdinalIgnoreCase);
         var isDataByDatePage = currentPage.Equals("/DataByDate", StringComparison.OrdinalIgnoreCase);
         var isDataByMonthPage = currentPage.Equals("/DataByMonth", StringComparison.OrdinalIgnoreCase);
-        var isRetryLogPage = isDashboardPage || isAnalysisPage || isDataByDatePage || isDataByMonthPage;
+        var isRetryLogPage = isDashboardPage || isAnalysisPage || isRetryLogImprovementPage || isDataByDatePage || isDataByMonthPage;
         var isErrorLogDashboardPage = currentPage.Equals("/ErrorLogDashboard", StringComparison.OrdinalIgnoreCase);
         var isErrorLogAnalysisPage = currentPage.Equals("/ErrorLogIndex", StringComparison.OrdinalIgnoreCase);
+        var isErrorLogImprovementPage = currentPage.Equals("/ErrorLogImprovement", StringComparison.OrdinalIgnoreCase);
         var isErrorLogDataByDatePage = currentPage.Equals("/ErrorLogDataByDate", StringComparison.OrdinalIgnoreCase);
         var isErrorLogDataByMonthPage = currentPage.Equals("/ErrorLogDataByMonth", StringComparison.OrdinalIgnoreCase);
-        var isErrorLogPage = isErrorLogDashboardPage || isErrorLogAnalysisPage || isErrorLogDataByDatePage || isErrorLogDataByMonthPage;
+        var isErrorLogPage = isErrorLogDashboardPage || isErrorLogAnalysisPage || isErrorLogImprovementPage || isErrorLogDataByDatePage || isErrorLogDataByMonthPage;
+        var canEdit = User.IsInRole("Staff") || User.IsInRole("Admin");
+        var profileInitial = string.IsNullOrWhiteSpace(User.Identity?.Name) ? "?" : User.Identity!.Name![..1].ToUpperInvariant();
     }
 
     <div class="app-shell">
@@ -41,6 +45,9 @@
                         </a>
                         <a class="sidebar-link sidebar-sublink @(isAnalysisPage ? "active" : "")" asp-area="" asp-page="/Index">
                             <span class="sidebar-link-title">Phân tích retryLog</span>
+                        </a>
+                        <a class="sidebar-link sidebar-sublink @(isRetryLogImprovementPage ? "active" : "")" asp-area="" asp-page="/RetryLogImprovement">
+                            <span class="sidebar-link-title">Cải thiện</span>
                         </a>
                         <a class="sidebar-link sidebar-sublink @(isDataByDatePage ? "active" : "")" asp-area="" asp-page="/DataByDate">
                             <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
@@ -64,6 +71,9 @@
                         <a class="sidebar-link sidebar-sublink @(isErrorLogAnalysisPage ? "active" : "")" asp-area="" asp-page="/ErrorLogIndex">
                             <span class="sidebar-link-title">Phân tích ErrorLog</span>
                         </a>
+                        <a class="sidebar-link sidebar-sublink @(isErrorLogImprovementPage ? "active" : "")" asp-area="" asp-page="/ErrorLogImprovement">
+                            <span class="sidebar-link-title">Cải thiện</span>
+                        </a>
                         <a class="sidebar-link sidebar-sublink @(isErrorLogDataByDatePage ? "active" : "")" asp-area="" asp-page="/ErrorLogDataByDate">
                             <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
                         </a>
@@ -72,12 +82,151 @@
                         </a>
                     </div>
                 </details>
+                @if (User.IsInRole("Admin"))
+                {
+                    <a class="sidebar-link sidebar-sublink" asp-page="/Users"><span class="sidebar-link-title">Quản lý người dùng</span></a>
+                }
             </nav>
         </aside>
 
         <main role="main" class="app-content">
+            <div class="dropdown app-user-menu">
+                <button class="app-user-avatar" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mở menu tài khoản">@profileInitial</button>
+                <div class="dropdown-menu dropdown-menu-end shadow app-user-dropdown">
+                    <div class="px-3 py-2 border-bottom"><div class="fw-semibold">@User.Identity?.Name</div><div class="small text-muted">@string.Join(", ", User.Claims.Where(c => c.Type.EndsWith("role")).Select(c => c.Value))</div></div>
+                    @if (User.IsInRole("Admin"))
+                    { <a class="dropdown-item" asp-page="/Users">Quản lý người dùng</a> }
+                    <form method="post" asp-page="/Login" asp-page-handler="Logout" class="logout-form"><button class="dropdown-item text-danger" type="submit">Đăng xuất</button></form>
+                </div>
+            </div>
             @RenderBody()
         </main>
+    </div>
+
+    @if (!canEdit)
+    {
+        <style>
+            form[method="post"]:not(.logout-form) button, button[onclick*="delete"], button[onclick*="ImproveModal"] { display: none !important; }
+        </style>
+    }
+
+    <!-- Shared Modals for Retry & Error Log Improvements -->
+    <div class="modal fade" id="retryImproveModal" tabindex="-1" aria-labelledby="retryImproveModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="retryImproveModalLabel"><i class="bi bi-tools"></i> Lưu Hành Động Cải Thiện RetryLog</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="retryImproveForm">
+                        <input type="hidden" id="retryImp_Id" value="0" />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Parts Name</label>
+                            <input type="text" class="form-control bg-light" id="retryImp_PartsName" readonly />
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Line</label>
+                                <input type="text" class="form-control bg-light" id="retryImp_Line" readonly />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Lane</label>
+                                <input type="text" class="form-control bg-light" id="retryImp_Lane" readonly />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Mặt (Side)</label>
+                                <input type="text" class="form-control bg-light" id="retryImp_Side" readonly />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Máy (Machine)</label>
+                                <input type="text" class="form-control bg-light" id="retryImp_Machine" readonly />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Feeder</label>
+                            <input type="text" class="form-control bg-light" id="retryImp_Feeder" readonly />
+                        </div>
+                        <hr />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Tên Kỹ Sư *</label>
+                            <input type="text" class="form-control border-danger" id="retryImp_EngineerName" required placeholder="Nhập tên kỹ sư thực hiện..." />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Hành Động Cải Thiện *</label>
+                            <textarea class="form-control border-danger" id="retryImp_ActionTaken" rows="3" required placeholder="Mô tả hành động khắc phục, thay thế feeder, căn chỉnh..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Ngày Thực Hiện *</label>
+                            <input type="date" class="form-control border-danger" id="retryImp_ExecutionDate" required />
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-warning fw-bold text-dark" onclick="submitRetryImproveForm()">Lưu Cải Thiện</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="errorImproveModal" tabindex="-1" aria-labelledby="errorImproveModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="errorImproveModalLabel"><i class="bi bi-tools"></i> Lưu Hành Động Cải Thiện ErrorLog</h5>
+                    <button type="button" class="btn-close-white btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="errorImproveForm">
+                        <input type="hidden" id="errorImp_Id" value="0" />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Error Name</label>
+                            <input type="text" class="form-control bg-light" id="errorImp_Error" readonly />
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Line</label>
+                                <input type="text" class="form-control bg-light" id="errorImp_Line" readonly />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Lane</label>
+                                <input type="text" class="form-control bg-light" id="errorImp_Lane" readonly />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Mặt (Side)</label>
+                                <input type="text" class="form-control bg-light" id="errorImp_Side" readonly />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Máy (Machine)</label>
+                                <input type="text" class="form-control bg-light" id="errorImp_Machine" readonly />
+                            </div>
+                        </div>
+                        <hr />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Tên Kỹ Sư *</label>
+                            <input type="text" class="form-control border-danger" id="errorImp_EngineerName" required placeholder="Nhập tên kỹ sư thực hiện..." />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Hành Động Cải Thiện *</label>
+                            <textarea class="form-control border-danger" id="errorImp_ActionTaken" rows="3" required placeholder="Mô tả hành động khắc phục lỗi máy, reset, hiệu chỉnh..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Ngày Thực Hiện *</label>
+                            <input type="date" class="form-control border-danger" id="errorImp_ExecutionDate" required />
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-danger fw-bold" onclick="submitErrorImproveForm()">Lưu Cải Thiện</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>

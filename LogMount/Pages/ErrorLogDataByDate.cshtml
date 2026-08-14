@@ -159,7 +159,12 @@
                 <div class="col-lg-7">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <h2 class="h5 card-title mb-1">Biểu đồ Top @Model.TopN lỗi nhiều nhất</h2>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h2 class="h5 card-title mb-0">Biểu đồ Top @Model.TopN lỗi nhiều nhất</h2>
+                                <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="downloadChartAsImage('dailyTopErrorsChart', 'Top_Loi_ErrorLog_Ngay.png')">
+                                    <i class="bi bi-camera-fill me-1"></i> Tải ảnh biểu đồ
+                                </button>
+                            </div>
                             <div class="chart-wrapper">
                                 <canvas id="dailyTopErrorsChart" aria-label="Biểu đồ top lỗi theo ngày"></canvas>
                             </div>
@@ -208,8 +213,8 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <h2 class="h5 card-title mb-0">Tổng hợp ErrorLog ngày @Model.SelectedDate</h2>
                     <div class="d-flex gap-2">
-                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("DetailSummary", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
-                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("DetailSummary", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("DetailSummary", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("DetailSummary", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                     </div>
                 </div>
                 @if (Model.DetailSummary.Count == 0)
@@ -230,6 +235,7 @@
                                     <th>Table</th>
                                     <th>Event No.</th>
                                     <th class="text-end">Số lần</th>
+                                    <th class="text-center">Cải thiện</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -244,6 +250,11 @@
                                         <td>@item.Table</td>
                                         <td>@item.EventNo</td>
                                         <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-secondary opacity-75 fw-semibold text-white py-0 px-2 fs-7" onclick="openErrorImproveModal('@item.Error', '@item.Line', '@item.Lane', '@item.Side', '@item.Machine')">
+                                                <i class="bi bi-tools"></i> Cải thiện
+                                            </button>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -251,6 +262,7 @@
                                 <tr class="table-secondary fw-semibold">
                                     <td colspan="7">Tổng cộng (đã lọc)</td>
                                     <td class="text-end">@Model.FilteredErrorCount.ToString("N0")</td>
+                                    <td></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -264,8 +276,8 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <h2 class="h5 card-title mb-0">Tổng hợp theo loại lỗi</h2>
                     <div class="d-flex gap-2">
-                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
-                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                     </div>
                 </div>
                 <div class="table-responsive summary-table-wrapper">
@@ -295,8 +307,8 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <h2 class="h5 card-title mb-1">Dữ liệu ErrorLog ngày @Model.SelectedDate</h2>
                     <div class="d-flex gap-2">
-                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Csv")' class="btn btn-outline-success btn-sm">Tải CSV</a>
-                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Xlsx")' class="btn btn-outline-success btn-sm">Tải Excel</a>
+                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                        <a asp-page="./ErrorLogDataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Logs", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
                     </div>
                 </div>
 
@@ -321,9 +333,10 @@
                             {
                                 var side = ErrorLogHelper.ParseSide(row.ProgramName);
                                 var machine = ErrorLogHelper.ParseMachine(row.ProgramName);
+                                var effectiveLine = ErrorLogHelper.GetEffectiveLine(row.Line, row.ProgramName);
                                 <tr>
                                     <td>@row.EventDate</td>
-                                    <td>@ErrorLogHelper.GetEffectiveLine(row.Line, row.ProgramName)</td>
+                                    <td>@effectiveLine</td>
                                     <td>@row.Lane</td>
                                     <td>@ErrorLogHelper.GetSideLabel(side) (@side)</td>
                                     <td>@machine</td>

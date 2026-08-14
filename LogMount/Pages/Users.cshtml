@@ -1,0 +1,25 @@
+@page "/Users"
+@model UsersModel
+@using LogMount.Models
+@{
+    ViewData["Title"] = "Quản lý người dùng";
+}
+<div class="logmount-page">
+    <div class="mb-4"><h1 class="h2 mb-1">Quản lý người dùng</h1><p class="text-muted mb-0">Tạo, cập nhật hoặc xóa tài khoản và phân quyền.</p></div>
+    @if (TempData["Status"] is string status) { <div class="alert alert-success">@status</div> }
+    @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
+    <div class="card shadow-sm mb-4"><div class="card-body"><h2 class="h5">Thêm người dùng</h2><form method="post" asp-page-handler="Create" class="row g-3">
+        <div class="col-md-3"><label asp-for="Input.Username" class="form-label">Tên đăng nhập</label><input asp-for="Input.Username" class="form-control" required /></div>
+        <div class="col-md-3"><label asp-for="Input.Password" class="form-label">Mật khẩu</label><input asp-for="Input.Password" type="password" class="form-control" required /></div>
+        <div class="col-md-3"><label asp-for="Input.FullName" class="form-label">Họ tên</label><input asp-for="Input.FullName" class="form-control" required /></div>
+        <div class="col-md-3"><label asp-for="Input.Department" class="form-label">Bộ phận</label><input asp-for="Input.Department" class="form-control" /></div>
+        <div class="col-md-3"><label asp-for="Input.EmployeeId" class="form-label">Mã ID</label><input asp-for="Input.EmployeeId" class="form-control" /></div>
+        <div class="col-md-3"><label asp-for="Input.Role" class="form-label">Quyền</label><select asp-for="Input.Role" class="form-select"><option value="User">User (chỉ xem)</option><option value="Staff">Staff</option><option value="Admin">Admin</option></select></div>
+        <div class="col-md-3 align-self-end"><button class="btn btn-primary" type="submit">Tạo tài khoản</button></div>
+    </form></div></div>
+    <div class="card shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-dark"><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Bộ phận</th><th>Mã ID</th><th>Role</th><th></th></tr></thead><tbody>
+    @foreach (var item in Model.Accounts) { <tr><td>@item.Username</td><td>@item.FullName</td><td>@item.Department</td><td>@item.EmployeeId</td><td><span class="badge bg-secondary">@item.Role</span></td><td class="text-end"><button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#editUser" data-id="@item.Id" data-name="@item.Username" data-fullname="@item.FullName" data-department="@item.Department" data-employeeid="@item.EmployeeId" data-role="@item.Role">Sửa</button><form method="post" asp-page-handler="Delete" asp-route-id="@item.Id" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Xóa tài khoản này?')">Xóa</button></form></td></tr> }
+    </tbody></table></div></div>
+</div>
+<div class="modal fade" id="editUser" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="post" asp-page-handler="Update"><div class="modal-header"><h2 class="modal-title h5">Cập nhật tài khoản</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input name="id" id="edit-id" type="hidden" /><div class="mb-2"><label class="form-label">Tên đăng nhập</label><input id="edit-name" class="form-control" readonly /></div><div class="mb-2"><label asp-for="Input.FullName" class="form-label">Họ tên</label><input asp-for="Input.FullName" id="edit-fullname" class="form-control" required /></div><div class="mb-2"><label asp-for="Input.Department" class="form-label">Bộ phận</label><input asp-for="Input.Department" id="edit-department" class="form-control" /></div><div class="mb-2"><label asp-for="Input.EmployeeId" class="form-label">Mã ID</label><input asp-for="Input.EmployeeId" id="edit-employeeid" class="form-control" /></div><div class="mb-2"><label asp-for="Input.Role" class="form-label">Quyền</label><select asp-for="Input.Role" id="edit-role" class="form-select"><option>User</option><option>Staff</option><option>Admin</option></select></div><div><label asp-for="Input.Password" class="form-label">Mật khẩu mới</label><input asp-for="Input.Password" type="password" class="form-control" placeholder="Để trống nếu không đổi" /></div></div><div class="modal-footer"><button class="btn btn-primary" type="submit">Lưu</button></div></form></div></div></div>
+@section Scripts { <script>document.getElementById('editUser').addEventListener('show.bs.modal', function (event) { var b=event.relatedTarget; document.getElementById('edit-id').value=b.dataset.id; document.getElementById('edit-name').value=b.dataset.name; document.getElementById('edit-fullname').value=b.dataset.fullname; document.getElementById('edit-department').value=b.dataset.department; document.getElementById('edit-employeeid').value=b.dataset.employeeid; document.getElementById('edit-role').value=b.dataset.role; });</script> }

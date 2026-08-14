@@ -14,6 +14,9 @@ public class LogMountDbContext : DbContext
     public DbSet<ErrorLogEntry> ErrorLogEntries => Set<ErrorLogEntry>();
     public DbSet<ExpensivePart> ExpensiveParts => Set<ExpensivePart>();
     public DbSet<AutoImportState> AutoImportStates => Set<AutoImportState>();
+    public DbSet<RetryImprove> RetryImproves => Set<RetryImprove>();
+    public DbSet<ErrorImprove> ErrorImproves => Set<ErrorImprove>();
+    public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +92,44 @@ public class LogMountDbContext : DbContext
             entity.HasIndex(x => x.Error);
             entity.HasIndex(x => x.Line);
             entity.HasIndex(x => x.UploadedAt);
+        });
+
+        modelBuilder.Entity<RetryImprove>(entity =>
+        {
+            entity.ToTable("RetryImprove");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PartsName).HasMaxLength(255);
+            entity.Property(x => x.Line).HasMaxLength(50);
+            entity.Property(x => x.Lane).HasMaxLength(50);
+            entity.Property(x => x.Side).HasMaxLength(50);
+            entity.Property(x => x.Machine).HasMaxLength(50);
+            entity.Property(x => x.Feeder).HasMaxLength(50);
+            entity.Property(x => x.EngineerName).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.ActionTaken).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => x.PartsName);
+            entity.HasIndex(x => x.ExecutionDate);
+        });
+
+        modelBuilder.Entity<ErrorImprove>(entity =>
+        {
+            entity.ToTable("ErrorImprove");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Error).HasMaxLength(255);
+            entity.Property(x => x.Line).HasMaxLength(50);
+            entity.Property(x => x.Lane).HasMaxLength(50);
+            entity.Property(x => x.Side).HasMaxLength(50);
+            entity.Property(x => x.Machine).HasMaxLength(50);
+            entity.Property(x => x.EngineerName).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.ActionTaken).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => x.Error);
+            entity.HasIndex(x => x.ExecutionDate);
+        });
+
+        modelBuilder.Entity<UserAccount>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.Username).IsUnique();
+            entity.HasIndex(x => x.EmployeeId);
         });
     }
 }
