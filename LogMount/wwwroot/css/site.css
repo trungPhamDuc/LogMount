@@ -132,13 +132,14 @@ body {
 }
 
 .app-content {
+  position: relative;
   flex: 1;
   min-width: 0;
   padding: 1.5rem;
 }
 
 .app-user-menu {
-  position: fixed;
+  position: absolute;
   z-index: 1050;
   top: 1rem;
   right: 1.25rem;

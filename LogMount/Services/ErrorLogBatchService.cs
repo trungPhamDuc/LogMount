@@ -109,7 +109,9 @@ public class ErrorLogBatchService : IErrorLogBatchService
         await BatchLock.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(batchFilePath) || await IsGeneratedSingleSourceBatchAsync(batchFilePath, cancellationToken))
+            if (!File.Exists(batchFilePath) ||
+                await IsGeneratedSingleSourceBatchAsync(batchFilePath, cancellationToken) ||
+                await HasLegacyLteMachineMappingAsync(batchFilePath, cancellationToken))
             {
                 await CreateDefaultBatchFileAsync(batchFilePath, errorLogFileName, outputFilePath, cancellationToken);
             }
@@ -199,6 +201,16 @@ public class ErrorLogBatchService : IErrorLogBatchService
         var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
         return batchContent.Contains(@"set ""SOURCE=%~dp0", StringComparison.OrdinalIgnoreCase) &&
                batchContent.Contains(@"copy /b ""%SOURCE%"" ""%OUTPUT%""", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // LTE machine folders use their real machine numbers (01, 02, 05, 06, 07, 08),
+    // not a sequential 01-07 numbering. Regenerate only the old, known-bad template.
+    private static async Task<bool> HasLegacyLteMachineMappingAsync(string batchFilePath, CancellationToken cancellationToken)
+    {
+        var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
+        return batchContent.Contains(@"\LINE_LTE\", StringComparison.OrdinalIgnoreCase) &&
+               (batchContent.Contains("LINELTE03.csv", StringComparison.OrdinalIgnoreCase) ||
+                batchContent.Contains("LINELTE04.csv", StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<string> CreateBatchFromRetryLogTemplateAsync(
