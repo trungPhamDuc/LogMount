@@ -30,6 +30,9 @@ public class ErrorLogAutoImportService : BackgroundService
             return;
         }
 
+        // Run an immediate import on startup so data is generated right away without waiting
+        await ImportTodayAsync(stoppingToken);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var now = DateTime.Now;
@@ -40,7 +43,7 @@ public class ErrorLogAutoImportService : BackgroundService
                 now,
                 await GetLastPreviousDayReimportDateAsync(DateOnly.FromDateTime(now), stoppingToken));
             var delay = nextRunTime - now;
-            var shouldImportToday = IsHourlyRun(nextRunTime);
+            var shouldImportToday = IsScheduledImportRun(nextRunTime);
 
             _logger.LogInformation(
                 "Next auto import error log will run at {NextRunTime}.",
@@ -62,36 +65,37 @@ public class ErrorLogAutoImportService : BackgroundService
 
     private static DateTime GetNextRunTime(DateTime now, DateOnly? lastPreviousDayReimportDate)
     {
-        var nextHourlyRun = GetNextHourlyRunTime(now);
+        var nextThirtyMinuteRun = GetNextThirtyMinuteRunTime(now);
         var today = DateOnly.FromDateTime(now);
         var todayReimportRun = now.Date.Add(PreviousDayReimportTime);
         var nextReimportRun = lastPreviousDayReimportDate == today || todayReimportRun <= now
             ? todayReimportRun.AddDays(1)
             : todayReimportRun;
 
-        return nextHourlyRun <= nextReimportRun
-            ? nextHourlyRun
+        return nextThirtyMinuteRun <= nextReimportRun
+            ? nextThirtyMinuteRun
             : nextReimportRun;
     }
 
-    private static DateTime GetNextHourlyRunTime(DateTime now)
+    private static DateTime GetNextThirtyMinuteRunTime(DateTime now)
     {
-        var currentSlot = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
-        var nextRun = now.Minute == 0 && now.Second == 0
+        var minuteSlot = now.Minute < 30 ? 0 : 30;
+        var currentSlot = new DateTime(now.Year, now.Month, now.Day, now.Hour, minuteSlot, 0);
+        var nextRun = now.Minute % 30 == 0 && now.Second == 0
             ? currentSlot
-            : currentSlot.AddHours(1);
+            : currentSlot.AddMinutes(30);
 
         if (nextRun <= now)
         {
-            nextRun = nextRun.AddHours(1);
+            nextRun = nextRun.AddMinutes(30);
         }
 
         return nextRun;
     }
 
-    private static bool IsHourlyRun(DateTime runTime)
+    private static bool IsScheduledImportRun(DateTime runTime)
     {
-        return runTime.Minute == 0 && runTime.Second == 0;
+        return runTime.Minute % 30 == 0 && runTime.Second == 0;
     }
 
     private async Task ImportTodayAsync(CancellationToken cancellationToken)
@@ -153,19 +157,24 @@ public class ErrorLogAutoImportService : BackgroundService
             }
 
             var previousDate = today.AddDays(-1);
-            var previousDateText = previousDate.ToString("yyyy/MM/dd");
-
-            var deletedCount = await dbContext.ErrorLogEntries
-                .Where(entry => entry.Date == previousDateText)
-                .ExecuteDeleteAsync(cancellationToken);
-
             var outputFilePath = await batchService.RunAsync(previousDate, cancellationToken);
             await using var stream = File.OpenRead(outputFilePath);
             var fileName = Path.GetFileName(outputFilePath);
             var entries = await parserService.ParseAsync(stream, fileName, cancellationToken);
 
+            var validEntries = entries.Where(ErrorLogAnalysisService.IsRealError).ToList();
+            if (validEntries.Count == 0)
+            {
+                throw new InvalidOperationException("Không thay thế dữ liệu ngày trước bằng tệp không có dòng ErrorLog hợp lệ.");
+            }
+
+            var previousDateText = previousDate.ToString("yyyy/MM/dd");
+            var deletedCount = await dbContext.ErrorLogEntries
+                .Where(entry => entry.Date == previousDateText)
+                .ExecuteDeleteAsync(cancellationToken);
+
             var savedCount = await importService.SaveNewEntriesAsync(
-                entries,
+                validEntries,
                 fileName,
                 Guid.NewGuid().ToString("N"),
                 DateTime.Now,
@@ -209,7 +218,7 @@ public class ErrorLogAutoImportService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not read previous day error log reimport state.");
+            _logger.LogWarning(ex, "Could not read previous day reimport state.");
             return null;
         }
     }
@@ -227,7 +236,7 @@ public class ErrorLogAutoImportService : BackgroundService
         var state = await dbContext.AutoImportStates
             .FirstOrDefaultAsync(x => x.JobName == PreviousDayReimportJobName, cancellationToken);
 
-        if (state?.LastRunDate == todayText)
+        if (state?.LastRunDate == todayText && state.LastCompletedAt is not null)
         {
             await transaction.CommitAsync(cancellationToken);
             return false;

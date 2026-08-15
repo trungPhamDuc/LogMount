@@ -28,7 +28,7 @@ public class ErrorLogBatchService : IErrorLogBatchService
     private static readonly Regex LocalErrorLogRootPattern = new(
         @"(?<!\\)[A-Z]:\\LOG\\ErrorLog",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly string[] FallbackDriveRoots = ["E:\\", "D:\\", "C:\\"];
+    private static readonly string[] FallbackDriveRoots = ["D:\\", "C:\\"];
     private static readonly SemaphoreSlim BatchLock = new(1, 1);
 
     private readonly IConfiguration _configuration;
@@ -146,6 +146,8 @@ public class ErrorLogBatchService : IErrorLogBatchService
                 FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 WorkingDirectory = Path.GetDirectoryName(batchFilePath) ?? Environment.CurrentDirectory
             };
             startInfo.ArgumentList.Add("/c");
@@ -153,16 +155,21 @@ public class ErrorLogBatchService : IErrorLogBatchService
 
             using var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("Không thể chạy file batch tổng hợp error log.");
-            await process.WaitForExitAsync(cancellationToken);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
-            if (!File.Exists(outputFilePath))
+            await process.WaitForExitAsync(cancellationToken);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0)
             {
-                await File.WriteAllTextAsync(outputFilePath, string.Empty, new UTF8Encoding(false), cancellationToken);
+                throw new InvalidOperationException($"File batch kết thúc với mã lỗi {process.ExitCode}. Details: {stderr}");
             }
 
-            if (process.ExitCode != 0 && new FileInfo(outputFilePath).Length > 0)
+            if (!File.Exists(outputFilePath) || new FileInfo(outputFilePath).Length == 0)
             {
-                throw new InvalidOperationException($"File batch kết thúc với mã lỗi {process.ExitCode}.");
+                throw new InvalidOperationException("Batch không tạo được dữ liệu ErrorLog. Dữ liệu đã có sẽ được giữ nguyên.");
             }
 
             return outputFilePath;
@@ -203,8 +210,6 @@ public class ErrorLogBatchService : IErrorLogBatchService
                batchContent.Contains(@"copy /b ""%SOURCE%"" ""%OUTPUT%""", StringComparison.OrdinalIgnoreCase);
     }
 
-    // LTE machine folders use their real machine numbers (01, 02, 05, 06, 07, 08),
-    // not a sequential 01-07 numbering. Regenerate only the old, known-bad template.
     private static async Task<bool> HasLegacyLteMachineMappingAsync(string batchFilePath, CancellationToken cancellationToken)
     {
         var batchContent = await File.ReadAllTextAsync(batchFilePath, cancellationToken);
@@ -293,7 +298,7 @@ endlocal
         var driveRoot = Path.GetPathRoot(outputFilePath);
         var drive = !string.IsNullOrWhiteSpace(driveRoot) && driveRoot.Length >= 2
             ? driveRoot[..2]
-            : "E:";
+            : "D:";
         return LocalErrorLogRootPattern.Replace(content, $@"{drive}\LOG\ErrorLog");
     }
 

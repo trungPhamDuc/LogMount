@@ -6,17 +6,22 @@
 
 <div class="logmount-page">
     <div class="page-header mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
                 <h1 class="h2 mb-1">Cải thiện RetryLog</h1>
                 <p class="text-muted mb-0">Phân tích xu hướng retries theo Ngày, xu hướng Linh kiện đắt tiền (LKDT) hoặc xem Nhật ký cải thiện đã thực hiện.</p>
             </div>
-            @if (Model.IsFilterApplied)
-            {
-                <span class="badge bg-primary fs-6 px-3 py-2">
-                    Tổng: @Model.FilteredRetries.ToString("N0") lần retries
-                </span>
-            }
+            <div class="d-flex align-items-center gap-2">
+                @if (Model.IsFilterApplied)
+                {
+                    <span class="badge bg-primary fs-6 px-3 py-2">
+                        Tổng: @Model.FilteredRetries.ToString("N0") lần retries
+                    </span>
+                }
+                <button type="button" class="btn btn-warning fw-bold text-dark px-3 py-2" onclick="openRetryImproveModal('', '', '', '', '', '', 0, '', '', '', false)">
+                    <i class="bi bi-plus-circle me-1"></i> Thêm cải thiện
+                </button>
+            </div>
         </div>
     </div>
 

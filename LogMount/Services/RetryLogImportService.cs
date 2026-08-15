@@ -101,14 +101,14 @@ public class RetryLogImportService : IRetryLogImportService
             .Where(RetryLogAnalysisService.IsRealError)
             .ToList();
 
+        if (realEntries.Count == 0)
+        {
+            throw new InvalidOperationException("Không thay thế dữ liệu RetryLog bằng tệp không có dòng hợp lệ.");
+        }
+
         await _dbContext.RetryLogEntries
             .Where(entry => entry.SourceFileName == sourceFileName)
             .ExecuteDeleteAsync(cancellationToken);
-
-        if (realEntries.Count == 0)
-        {
-            return 0;
-        }
 
         foreach (var entry in realEntries)
         {

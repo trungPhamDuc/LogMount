@@ -6,17 +6,22 @@
 
 <div class="logmount-page">
     <div class="page-header mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
                 <h1 class="h2 mb-1">Cải thiện ErrorLog</h1>
                 <p class="text-muted mb-0">Phân tích xu hướng lỗi theo Ngày, loại lỗi phát sinh nhiều nhất hoặc xem Nhật ký cải thiện đã thực hiện.</p>
             </div>
-            @if (Model.IsFilterApplied)
-            {
-                <span class="badge bg-danger fs-6 px-3 py-2">
-                    Tổng: @Model.FilteredErrors.ToString("N0") lần lỗi
-                </span>
-            }
+            <div class="d-flex align-items-center gap-2">
+                @if (Model.IsFilterApplied)
+                {
+                    <span class="badge bg-danger fs-6 px-3 py-2">
+                        Tổng: @Model.FilteredErrors.ToString("N0") lần lỗi
+                    </span>
+                }
+                <button type="button" class="btn btn-danger fw-bold px-3 py-2" onclick="openErrorImproveModal('', '', '', '', '', 0, '', '', '', false)">
+                    <i class="bi bi-plus-circle me-1"></i> Thêm cải thiện
+                </button>
+            </div>
         </div>
     </div>
 

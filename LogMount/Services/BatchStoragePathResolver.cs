@@ -10,8 +10,7 @@ public interface IBatchStoragePathResolver
 
 public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
 {
-    private static readonly string[] ExistingPathDriveRoots = ["E:\\", "D:\\", "C:\\"];
-    private static readonly string[] NewPathDriveRoots = ["D:\\", "C:\\", "E:\\"];
+    private static readonly string[] SharedDriveRoots = ["D:\\", "C:\\"];
 
     private readonly IHostEnvironment _environment;
     private readonly ILogger<BatchStoragePathResolver> _logger;
@@ -41,7 +40,7 @@ public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
         }
 
         var suffix = configuredPath[root.Length..];
-        var existingPath = ExistingPathDriveRoots
+        var existingPath = SharedDriveRoots
             .Select(driveRoot => driveRoot + suffix)
             .FirstOrDefault(File.Exists);
         if (!string.IsNullOrWhiteSpace(existingPath))
@@ -49,7 +48,7 @@ public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
             return existingPath;
         }
 
-        var fallbackPath = NewPathDriveRoots
+        var fallbackPath = SharedDriveRoots
             .Where(Directory.Exists)
             .Select(driveRoot => driveRoot + suffix)
             .FirstOrDefault();
@@ -60,7 +59,7 @@ public sealed class BatchStoragePathResolver : IBatchStoragePathResolver
         }
 
         _logger.LogWarning(
-            "Configured path {ConfiguredPath} was not found on E/D/C. Using shared fallback {FallbackPath}.",
+            "Configured path {ConfiguredPath} was not found on D/C. Using shared fallback {FallbackPath}.",
             configuredPath,
             fallbackPath);
 

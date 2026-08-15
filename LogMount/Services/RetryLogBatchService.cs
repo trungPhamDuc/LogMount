@@ -28,7 +28,7 @@ public class RetryLogBatchService : IRetryLogBatchService
     private static readonly Regex LocalRetryLogRootPattern = new(
         @"(?<!\\)[A-Z]:\\LOG\\RetryLog",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly string[] FallbackDriveRoots = ["E:\\", "D:\\", "C:\\"];
+    private static readonly string[] FallbackDriveRoots = ["D:\\", "C:\\"];
     private static readonly SemaphoreSlim BatchLock = new(1, 1);
 
     private readonly IConfiguration _configuration;
@@ -143,6 +143,8 @@ public class RetryLogBatchService : IRetryLogBatchService
                 FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 WorkingDirectory = Path.GetDirectoryName(batchFilePath) ?? Environment.CurrentDirectory
             };
             startInfo.ArgumentList.Add("/c");
@@ -150,16 +152,21 @@ public class RetryLogBatchService : IRetryLogBatchService
 
             using var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("Không thể chạy file batch tổng hợp retry log.");
-            await process.WaitForExitAsync(cancellationToken);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
-            if (!File.Exists(outputFilePath))
+            await process.WaitForExitAsync(cancellationToken);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0)
             {
-                await File.WriteAllTextAsync(outputFilePath, string.Empty, new UTF8Encoding(false), cancellationToken);
+                throw new InvalidOperationException($"File batch kết thúc với mã lỗi {process.ExitCode}. Details: {stderr}");
             }
 
-            if (process.ExitCode != 0 && new FileInfo(outputFilePath).Length > 0)
+            if (!File.Exists(outputFilePath) || new FileInfo(outputFilePath).Length == 0)
             {
-                throw new InvalidOperationException($"File batch kết thúc với mã lỗi {process.ExitCode}.");
+                throw new InvalidOperationException("Batch không tạo được dữ liệu RetryLog. Dữ liệu đã có sẽ được giữ nguyên.");
             }
 
             return outputFilePath;
@@ -299,7 +306,7 @@ endlocal
         var driveRoot = Path.GetPathRoot(outputFilePath);
         var drive = !string.IsNullOrWhiteSpace(driveRoot) && driveRoot.Length >= 2
             ? driveRoot[..2]
-            : "E:";
+            : "D:";
         return LocalRetryLogRootPattern.Replace(content, $@"{drive}\LOG\RetryLog");
     }
 

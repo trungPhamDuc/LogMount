@@ -114,7 +114,11 @@ window.refreshImprovementLists = function() {
 };
 
 // RetryLog Improvement Modal Open & Save Logic
-window.openRetryImproveModal = function(partsName, line, lane, side, machine, feeder, id, engineerName, actionTaken, executionDate) {
+window.openRetryImproveModal = function(partsName, line, lane, side, machine, feeder, id, engineerName, actionTaken, executionDate, isReadOnly) {
+    var readOnly = (typeof isReadOnly === 'boolean') 
+        ? isReadOnly 
+        : (Boolean(partsName) && (!id || id === 0));
+
     var idEl = document.getElementById('retryImp_Id');
     var partsNameEl = document.getElementById('retryImp_PartsName');
     var lineEl = document.getElementById('retryImp_Line');
@@ -125,6 +129,26 @@ window.openRetryImproveModal = function(partsName, line, lane, side, machine, fe
     var engineerNameEl = document.getElementById('retryImp_EngineerName');
     var actionTakenEl = document.getElementById('retryImp_ActionTaken');
     var executionDateEl = document.getElementById('retryImp_ExecutionDate');
+    var titleEl = document.getElementById('retryImproveModalLabel');
+
+    if (titleEl) {
+        titleEl.innerHTML = (id && id > 0)
+            ? '<i class="bi bi-pencil-square"></i> Cập Nhật Hành Động Cải Thiện RetryLog'
+            : (readOnly ? '<i class="bi bi-tools"></i> Lưu Hành Động Cải Thiện RetryLog' : '<i class="bi bi-plus-circle"></i> Thêm Hành Động Cải Thiện RetryLog');
+    }
+
+    var fields = [partsNameEl, lineEl, laneEl, sideEl, machineEl, feederEl];
+    fields.forEach(function(el) {
+        if (el) {
+            if (readOnly) {
+                el.setAttribute('readonly', 'readonly');
+                el.classList.add('bg-light');
+            } else {
+                el.removeAttribute('readonly');
+                el.classList.remove('bg-light');
+            }
+        }
+    });
 
     if (idEl) idEl.value = id || '0';
     if (partsNameEl) partsNameEl.value = partsName || '';
@@ -230,7 +254,11 @@ window.deleteRetryImprove = function(id) {
 };
 
 // ErrorLog Improvement Modal Open & Save Logic
-window.openErrorImproveModal = function(error, line, lane, side, machine, id, engineerName, actionTaken, executionDate) {
+window.openErrorImproveModal = function(error, line, lane, side, machine, id, engineerName, actionTaken, executionDate, isReadOnly) {
+    var readOnly = (typeof isReadOnly === 'boolean') 
+        ? isReadOnly 
+        : (Boolean(error) && (!id || id === 0));
+
     var idEl = document.getElementById('errorImp_Id');
     var errorEl = document.getElementById('errorImp_Error');
     var lineEl = document.getElementById('errorImp_Line');
@@ -240,6 +268,26 @@ window.openErrorImproveModal = function(error, line, lane, side, machine, id, en
     var engineerNameEl = document.getElementById('errorImp_EngineerName');
     var actionTakenEl = document.getElementById('errorImp_ActionTaken');
     var executionDateEl = document.getElementById('errorImp_ExecutionDate');
+    var titleEl = document.getElementById('errorImproveModalLabel');
+
+    if (titleEl) {
+        titleEl.innerHTML = (id && id > 0)
+            ? '<i class="bi bi-pencil-square"></i> Cập Nhật Hành Động Cải Thiện ErrorLog'
+            : (readOnly ? '<i class="bi bi-tools"></i> Lưu Hành Động Cải Thiện ErrorLog' : '<i class="bi bi-plus-circle"></i> Thêm Hành Động Cải Thiện ErrorLog');
+    }
+
+    var fields = [errorEl, lineEl, laneEl, sideEl, machineEl];
+    fields.forEach(function(el) {
+        if (el) {
+            if (readOnly) {
+                el.setAttribute('readonly', 'readonly');
+                el.classList.add('bg-light');
+            } else {
+                el.removeAttribute('readonly');
+                el.classList.remove('bg-light');
+            }
+        }
+    });
 
     if (idEl) idEl.value = id || '0';
     if (errorEl) errorEl.value = error || '';

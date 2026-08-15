@@ -7,6 +7,11 @@ public static class ErrorLogAnalysisService
 {
     private const int MaxDistinctDisplay = 5;
 
+    public static bool IsRealError(ErrorLogEntry entry)
+    {
+        return !string.IsNullOrWhiteSpace(entry.Error) || !string.IsNullOrWhiteSpace(entry.EventNo);
+    }
+
     public static IReadOnlyList<ErrorLogEntry> Filter(
         IReadOnlyList<ErrorLogEntry> entries,
         ErrorLogFilterCriteria criteria)
