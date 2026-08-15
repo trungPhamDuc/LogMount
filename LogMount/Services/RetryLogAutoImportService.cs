@@ -65,29 +65,28 @@ public class RetryLogAutoImportService : BackgroundService
 
     private static DateTime GetNextRunTime(DateTime now, DateOnly? lastPreviousDayReimportDate)
     {
-        var nextThirtyMinuteRun = GetNextThirtyMinuteRunTime(now);
+        var nextHourlyRun = GetNextHourlyRunTime(now);
         var today = DateOnly.FromDateTime(now);
         var todayReimportRun = now.Date.Add(PreviousDayReimportTime);
         var nextReimportRun = lastPreviousDayReimportDate == today || todayReimportRun <= now
             ? todayReimportRun.AddDays(1)
             : todayReimportRun;
 
-        return nextThirtyMinuteRun <= nextReimportRun
-            ? nextThirtyMinuteRun
+        return nextHourlyRun <= nextReimportRun
+            ? nextHourlyRun
             : nextReimportRun;
     }
 
-    private static DateTime GetNextThirtyMinuteRunTime(DateTime now)
+    private static DateTime GetNextHourlyRunTime(DateTime now)
     {
-        var minuteSlot = now.Minute < 30 ? 0 : 30;
-        var currentSlot = new DateTime(now.Year, now.Month, now.Day, now.Hour, minuteSlot, 0);
-        var nextRun = now.Minute % 30 == 0 && now.Second == 0
+        var currentSlot = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
+        var nextRun = now.Minute == 0 && now.Second == 0
             ? currentSlot
-            : currentSlot.AddMinutes(30);
+            : currentSlot.AddHours(1);
 
         if (nextRun <= now)
         {
-            nextRun = nextRun.AddMinutes(30);
+            nextRun = nextRun.AddHours(1);
         }
 
         return nextRun;
@@ -95,7 +94,7 @@ public class RetryLogAutoImportService : BackgroundService
 
     private static bool IsScheduledImportRun(DateTime runTime)
     {
-        return runTime.Minute % 30 == 0 && runTime.Second == 0;
+        return runTime.Minute == 0 && runTime.Second == 0;
     }
 
     private async Task ImportTodayAsync(CancellationToken cancellationToken)

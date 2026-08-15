@@ -54,7 +54,7 @@ public class ImprovementController : ControllerBase
         item.Lane = model.Lane;
         item.Side = model.Side;
         item.Machine = model.Machine;
-        item.Feeder = model.Feeder;
+        item.ErrorName = model.ErrorName;
         item.EngineerName = model.EngineerName;
         item.ActionTaken = model.ActionTaken;
         item.ExecutionDate = model.ExecutionDate;

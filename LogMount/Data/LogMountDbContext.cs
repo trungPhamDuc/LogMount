@@ -103,7 +103,7 @@ public class LogMountDbContext : DbContext
             entity.Property(x => x.Lane).HasMaxLength(50);
             entity.Property(x => x.Side).HasMaxLength(50);
             entity.Property(x => x.Machine).HasMaxLength(50);
-            entity.Property(x => x.Feeder).HasMaxLength(50);
+            entity.Property(x => x.ErrorName).HasMaxLength(255);
             entity.Property(x => x.EngineerName).HasMaxLength(255).IsRequired();
             entity.Property(x => x.ActionTaken).HasMaxLength(2000).IsRequired();
             entity.HasIndex(x => x.PartsName);

@@ -43,18 +43,19 @@ window.loadRetryImproveHistory = function() {
             list.forEach(function(item) {
                 var dateStr = item.executionDate ? new Date(item.executionDate).toLocaleDateString('vi-VN') : '';
                 var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : '';
-                html += '<tr>' +
+                var jsonAttr = JSON.stringify(item).replace(/'/g, "&apos;");
+                html += '<tr style="cursor: pointer;" data-json=\'' + jsonAttr + '\' onclick="onRetryRowClick(event, this)">' +
                     '<td class="fw-bold text-success">' + dateStr + '</td>' +
                     '<td class="fw-bold text-primary">' + (item.partsName || '') + '</td>' +
                     '<td>' + (item.line || '') + '</td>' +
                     '<td>' + (item.lane || '') + '</td>' +
                     '<td>' + (item.side || '') + '</td>' +
                     '<td>' + (item.machine || '') + '</td>' +
-                    '<td>' + (item.feeder || '') + '</td>' +
+                    '<td>' + (item.errorName || item.feeder || '') + '</td>' +
                     '<td class="fw-bold">' + (item.engineerName || '') + '</td>' +
                     '<td class="text-wrap" style="max-width: 300px;">' + (item.actionTaken || '') + '</td>' +
                     '<td class="text-center text-nowrap">' +
-                        '<button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="openRetryImproveModal(\'' + (item.partsName || '') + '\', \'' + (item.line || '') + '\', \'' + (item.lane || '') + '\', \'' + (item.side || '') + '\', \'' + (item.machine || '') + '\', \'' + (item.feeder || '') + '\', ' + item.id + ', \'' + (item.engineerName || '') + '\', \'' + (item.actionTaken || '').replace(/'/g, "\\'") + '\', \'' + isoDate + '\')"><i class="bi bi-pencil"></i> Sửa</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="onEditRetryBtnClick(event, this)"><i class="bi bi-pencil"></i> Sửa</button>' +
                         '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7" onclick="deleteRetryImprove(' + item.id + ')"><i class="bi bi-trash"></i> Xóa</button>' +
                     '</td>' +
                     '</tr>';
@@ -114,7 +115,7 @@ window.refreshImprovementLists = function() {
 };
 
 // RetryLog Improvement Modal Open & Save Logic
-window.openRetryImproveModal = function(partsName, line, lane, side, machine, feeder, id, engineerName, actionTaken, executionDate, isReadOnly) {
+window.openRetryImproveModal = function(partsName, line, lane, side, machine, errorName, id, engineerName, actionTaken, executionDate, isReadOnly) {
     var readOnly = (typeof isReadOnly === 'boolean') 
         ? isReadOnly 
         : (Boolean(partsName) && (!id || id === 0));
@@ -125,7 +126,7 @@ window.openRetryImproveModal = function(partsName, line, lane, side, machine, fe
     var laneEl = document.getElementById('retryImp_Lane');
     var sideEl = document.getElementById('retryImp_Side');
     var machineEl = document.getElementById('retryImp_Machine');
-    var feederEl = document.getElementById('retryImp_Feeder');
+    var errorNameEl = document.getElementById('retryImp_ErrorName');
     var engineerNameEl = document.getElementById('retryImp_EngineerName');
     var actionTakenEl = document.getElementById('retryImp_ActionTaken');
     var executionDateEl = document.getElementById('retryImp_ExecutionDate');
@@ -137,7 +138,7 @@ window.openRetryImproveModal = function(partsName, line, lane, side, machine, fe
             : (readOnly ? '<i class="bi bi-tools"></i> Lưu Hành Động Cải Thiện RetryLog' : '<i class="bi bi-plus-circle"></i> Thêm Hành Động Cải Thiện RetryLog');
     }
 
-    var fields = [partsNameEl, lineEl, laneEl, sideEl, machineEl, feederEl];
+    var fields = [partsNameEl, lineEl, laneEl, sideEl, machineEl, errorNameEl];
     fields.forEach(function(el) {
         if (el) {
             if (readOnly) {
@@ -156,7 +157,7 @@ window.openRetryImproveModal = function(partsName, line, lane, side, machine, fe
     if (laneEl) laneEl.value = lane || '';
     if (sideEl) sideEl.value = side || '';
     if (machineEl) machineEl.value = machine || '';
-    if (feederEl) feederEl.value = feeder || '';
+    if (errorNameEl) errorNameEl.value = errorName || '';
     if (engineerNameEl) engineerNameEl.value = engineerName || '';
     if (actionTakenEl) actionTakenEl.value = actionTaken || '';
     if (executionDateEl) {
@@ -181,7 +182,7 @@ window.submitRetryImproveForm = function() {
     var lane = document.getElementById('retryImp_Lane')?.value || '';
     var side = document.getElementById('retryImp_Side')?.value || '';
     var machine = document.getElementById('retryImp_Machine')?.value || '';
-    var feeder = document.getElementById('retryImp_Feeder')?.value || '';
+    var errorName = document.getElementById('retryImp_ErrorName')?.value || '';
     var engineerName = document.getElementById('retryImp_EngineerName')?.value || '';
     var actionTaken = document.getElementById('retryImp_ActionTaken')?.value || '';
     var executionDate = document.getElementById('retryImp_ExecutionDate')?.value || '';
@@ -197,7 +198,7 @@ window.submitRetryImproveForm = function() {
         lane: lane,
         side: side,
         machine: machine,
-        feeder: feeder,
+        errorName: errorName,
         engineerName: engineerName,
         actionTaken: actionTaken,
         executionDate: executionDate
@@ -251,6 +252,115 @@ window.deleteRetryImprove = function(id) {
         console.error(err);
         alert('Lỗi kết nối máy chủ!');
     });
+};
+
+window.onEditRetryBtnClick = function(event, btn) {
+    if (event) event.stopPropagation();
+    var tr = btn.closest('tr');
+    if (!tr) return;
+    var jsonStr = tr.getAttribute('data-json');
+    if (!jsonStr) return;
+    var item = JSON.parse(jsonStr);
+    var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : (item.ExecutionDate ? item.ExecutionDate.substring(0, 10) : '');
+    openRetryImproveModal(
+        item.partsName || item.PartsName || '',
+        item.line || item.Line || '',
+        item.lane || item.Lane || '',
+        item.side || item.Side || '',
+        item.machine || item.Machine || '',
+        item.errorName || item.ErrorName || item.feeder || item.Feeder || '',
+        item.id || item.Id || 0,
+        item.engineerName || item.EngineerName || '',
+        item.actionTaken || item.ActionTaken || '',
+        isoDate,
+        false
+    );
+};
+
+window.onRetryRowClick = function(event, tr) {
+    if (event.target.closest('button') || event.target.closest('a')) return;
+    var jsonStr = tr.getAttribute('data-json');
+    if (!jsonStr) return;
+    var item = JSON.parse(jsonStr);
+    var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : (item.ExecutionDate ? item.ExecutionDate.substring(0, 10) : '');
+
+    var fromDateEl = document.querySelector('input[name="Filter.FromDate"]');
+    var toDateEl = document.querySelector('input[name="Filter.ToDate"]');
+    var partsNameEl = document.querySelector('input[name="Filter.PartsName"]');
+    var lineEl = document.querySelector('input[name="Filter.Line"]');
+    var laneEl = document.querySelector('input[name="Filter.Lane"]');
+    var sideEl = document.querySelector('select[name="Filter.Side"]');
+
+    if (fromDateEl) fromDateEl.value = isoDate;
+    if (toDateEl) toDateEl.value = isoDate;
+    if (partsNameEl) partsNameEl.value = item.partsName || item.PartsName || '';
+    if (lineEl) lineEl.value = item.line || item.Line || '';
+    if (laneEl) laneEl.value = item.lane || item.Lane || '';
+    if (sideEl) {
+        var s = (item.side || item.Side || '').toUpperCase();
+        if (s === 'T' || s === 'TOP') sideEl.value = 'TOP';
+        else if (s === 'B' || s === 'BOT') sideEl.value = 'BOT';
+        else sideEl.value = s;
+    }
+
+    var form = fromDateEl ? fromDateEl.closest('form') : document.querySelector('form');
+    if (form) {
+        form.submit();
+    }
+};
+
+window.onEditErrorBtnClick = function(event, btn) {
+    if (event) event.stopPropagation();
+    var tr = btn.closest('tr');
+    if (!tr) return;
+    var jsonStr = tr.getAttribute('data-json');
+    if (!jsonStr) return;
+    var item = JSON.parse(jsonStr);
+    var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : (item.ExecutionDate ? item.ExecutionDate.substring(0, 10) : '');
+    openErrorImproveModal(
+        item.error || item.Error || '',
+        item.line || item.Line || '',
+        item.lane || item.Lane || '',
+        item.side || item.Side || '',
+        item.machine || item.Machine || '',
+        item.id || item.Id || 0,
+        item.engineerName || item.EngineerName || '',
+        item.actionTaken || item.ActionTaken || '',
+        isoDate,
+        false
+    );
+};
+
+window.onErrorRowClick = function(event, tr) {
+    if (event.target.closest('button') || event.target.closest('a')) return;
+    var jsonStr = tr.getAttribute('data-json');
+    if (!jsonStr) return;
+    var item = JSON.parse(jsonStr);
+    var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : (item.ExecutionDate ? item.ExecutionDate.substring(0, 10) : '');
+
+    var fromDateEl = document.querySelector('input[name="Filter.FromDate"]');
+    var toDateEl = document.querySelector('input[name="Filter.ToDate"]');
+    var errorEl = document.querySelector('input[name="Filter.Error"]');
+    var lineEl = document.querySelector('input[name="Filter.Line"]');
+    var laneEl = document.querySelector('input[name="Filter.Lane"]');
+    var sideEl = document.querySelector('select[name="Filter.Side"]');
+
+    if (fromDateEl) fromDateEl.value = isoDate;
+    if (toDateEl) toDateEl.value = isoDate;
+    if (errorEl) errorEl.value = item.error || item.Error || '';
+    if (lineEl) lineEl.value = item.line || item.Line || '';
+    if (laneEl) laneEl.value = item.lane || item.Lane || '';
+    if (sideEl) {
+        var s = (item.side || item.Side || '').toUpperCase();
+        if (s === 'T' || s === 'TOP') sideEl.value = 'TOP';
+        else if (s === 'B' || s === 'BOT') sideEl.value = 'BOT';
+        else sideEl.value = s;
+    }
+
+    var form = fromDateEl ? fromDateEl.closest('form') : document.querySelector('form');
+    if (form) {
+        form.submit();
+    }
 };
 
 // ErrorLog Improvement Modal Open & Save Logic

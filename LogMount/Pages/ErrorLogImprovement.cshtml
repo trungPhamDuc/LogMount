@@ -350,9 +350,8 @@
                                     {
                                         @foreach (var item in Model.ImprovementHistoryItems)
                                         {
-                                            var isoDate = item.ExecutionDate.ToString("yyyy-MM-dd");
-                                            var safeAction = (item.ActionTaken ?? "").Replace("'", "\\'");
-                                            <tr>
+                                            var jsonStr = System.Text.Json.JsonSerializer.Serialize(item);
+                                            <tr style="cursor: pointer;" data-json='@Html.Raw(jsonStr)' onclick="onErrorRowClick(event, this)" title="Click để lọc biểu đồ theo bản ghi này">
                                                 <td class="fw-bold text-success">@item.ExecutionDate.ToString("dd/MM/yyyy")</td>
                                                 <td class="fw-bold text-danger">@item.Error</td>
                                                 <td>@item.Line</td>
@@ -362,12 +361,12 @@
                                                 <td class="fw-bold text-dark">@item.EngineerName</td>
                                                 <td class="text-wrap" style="max-width: 300px;">@item.ActionTaken</td>
                                                 <td class="text-center text-nowrap">
-                                                    <button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="openErrorImproveModal('@item.Error', '@item.Line', '@item.Lane', '@item.Side', '@item.Machine', @item.Id, '@item.EngineerName', '@safeAction', '@isoDate')">
+                                                    <button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="onEditErrorBtnClick(event, this)">
                                                         <i class="bi bi-pencil"></i> Sửa
                                                     </button>
                                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7" onclick="deleteErrorImprove(@item.Id)">
                                                         <i class="bi bi-trash"></i> Xóa
-                                                     </button>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         }

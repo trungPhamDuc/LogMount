@@ -377,7 +377,7 @@
                                         <th>Lane</th>
                                         <th>Mặt</th>
                                         <th>Máy</th>
-                                        <th>Feeder</th>
+                                        <th>Error Name</th>
                                         <th>Kỹ sư thực hiện</th>
                                         <th>Hành động cải thiện</th>
                                         <th class="text-center">Thao tác</th>
@@ -396,20 +396,20 @@
                                     {
                                         @foreach (var item in Model.ImprovementHistoryItems)
                                         {
-                                            var isoDate = item.ExecutionDate.ToString("yyyy-MM-dd");
-                                            var safeAction = (item.ActionTaken ?? "").Replace("'", "\\'");
-                                            <tr>
+                                            var jsonStr = System.Text.Json.JsonSerializer.Serialize(item);
+                                            var displayErrorName = item.ErrorName ?? string.Empty;
+                                            <tr style="cursor: pointer;" data-json='@Html.Raw(jsonStr)' onclick="onRetryRowClick(event, this)" title="Click để lọc biểu đồ theo bản ghi này">
                                                 <td class="fw-bold text-success">@item.ExecutionDate.ToString("dd/MM/yyyy")</td>
                                                 <td class="fw-bold text-primary">@item.PartsName</td>
                                                 <td>@item.Line</td>
                                                 <td>@item.Lane</td>
                                                 <td>@item.Side</td>
                                                 <td>@item.Machine</td>
-                                                <td>@item.Feeder</td>
+                                                <td>@displayErrorName</td>
                                                 <td class="fw-bold text-dark">@item.EngineerName</td>
                                                 <td class="text-wrap" style="max-width: 300px;">@item.ActionTaken</td>
                                                 <td class="text-center text-nowrap">
-                                                    <button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="openRetryImproveModal('@item.PartsName', '@item.Line', '@item.Lane', '@item.Side', '@item.Machine', '@item.Feeder', @item.Id, '@item.EngineerName', '@safeAction', '@isoDate')">
+                                                    <button type="button" class="btn btn-sm btn-outline-warning me-1 py-0 px-2 fs-7" onclick="onEditRetryBtnClick(event, this)">
                                                         <i class="bi bi-pencil"></i> Sửa
                                                     </button>
                                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7" onclick="deleteRetryImprove(@item.Id)">

@@ -24,8 +24,8 @@ public class RetryImprove
     [MaxLength(50)]
     public string? Machine { get; set; }
 
-    [MaxLength(50)]
-    public string? Feeder { get; set; }
+    [MaxLength(255)]
+    public string? ErrorName { get; set; }
 
     [Required]
     [MaxLength(255)]
