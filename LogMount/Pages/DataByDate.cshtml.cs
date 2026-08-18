@@ -115,29 +115,14 @@ public class DataByDateModel : PageModel
             return;
         }
 
-        var query = ApplyLogFilter(ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
-            .Where(x => x.Date == SelectedDate), Filter);
-
-        var allRows = await query
-            .OrderByDescending(x => x.UploadedAt)
-            .ThenBy(x => x.Id)
-            .ToListAsync(cancellationToken);
-
-        allRows = RetryLogAnalysisService.ApplyTimeRangeFilter(allRows, Filter).ToList();
-        ErrorSummary = RetryLogAnalysisService.SummarizeErrors(allRows);
-        TotalRecords = allRows.Count;
-        TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
-        PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
-
-        Entries = allRows
-            .Skip((PageNumber - 1) * PageSize)
-            .Take(PageSize)
-            .ToList();
-
         if (ShowExpensiveParts)
         {
-            await LoadExpensivePartSummaryAsync(query, cancellationToken);
+            await LoadExpensivePartSummaryAsync(BuildSelectedDateQuery(), cancellationToken);
+            TotalPages = 1;
+            return;
         }
+
+        await LoadRetryLogSectionAsync(cancellationToken);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(CancellationToken cancellationToken)
@@ -268,6 +253,7 @@ public class DataByDateModel : PageModel
             ["PartPageNumber"] = PartPageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Lane"] = PartFilter.Lane,
             ["PartFilter.Machine"] = PartFilter.Machine,
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
@@ -303,6 +289,7 @@ public class DataByDateModel : PageModel
             ["PartPageNumber"] = pageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Lane"] = PartFilter.Lane,
             ["PartFilter.Machine"] = PartFilter.Machine,
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
@@ -328,6 +315,7 @@ public class DataByDateModel : PageModel
             ["PartPageNumber"] = PartPageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Lane"] = PartFilter.Lane,
             ["PartFilter.Machine"] = PartFilter.Machine,
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
@@ -378,7 +366,7 @@ public class DataByDateModel : PageModel
             return;
         }
 
-        var entries = await selectedDateQuery
+        var entries = await ApplyPartFilterBeforeSummarize(selectedDateQuery, PartFilter)
             .Where(entry => entry.PartsName != null &&
                             expensivePartNames.Contains(entry.PartsName) &&
                             (entry.ErrorNo == null || entry.ErrorNo.Trim() != "0") &&
@@ -432,13 +420,73 @@ public class DataByDateModel : PageModel
             return [];
         }
 
-        var entries = await ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
+        var entries = await ApplyPartFilterBeforeSummarize(
+                ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking()),
+                PartFilter)
             .Where(entry => entry.Date == selectedDate &&
                             entry.PartsName != null &&
                             expensivePartNames.Contains(entry.PartsName))
             .ToListAsync(cancellationToken);
 
         return ExpensivePartAnalysisService.Summarize(entries, expensiveParts);
+    }
+
+    private async Task LoadRetryLogSectionAsync(CancellationToken cancellationToken)
+    {
+        var query = ApplyLogFilter(BuildSelectedDateQuery(), Filter);
+
+        var allRows = await query
+            .OrderByDescending(x => x.UploadedAt)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        allRows = RetryLogAnalysisService.ApplyTimeRangeFilter(allRows, Filter).ToList();
+        ErrorSummary = RetryLogAnalysisService.SummarizeErrors(allRows);
+        TotalRecords = allRows.Count;
+        TotalPages = Math.Max(1, (int)Math.Ceiling(TotalRecords / (double)PageSize));
+        PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
+
+        Entries = allRows
+            .Skip((PageNumber - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+    }
+
+    private IQueryable<RetryLogEntry> BuildSelectedDateQuery()
+    {
+        return ApplyRealErrorFilter(_dbContext.RetryLogEntries.AsNoTracking())
+            .Where(x => x.Date == SelectedDate);
+    }
+
+    private static IQueryable<RetryLogEntry> ApplyPartFilterBeforeSummarize(
+        IQueryable<RetryLogEntry> query,
+        ExpensivePartFilterCriteria criteria)
+    {
+        if (!string.IsNullOrWhiteSpace(criteria.PartsName))
+        {
+            var partsName = criteria.PartsName.Trim();
+            query = query.Where(x => x.PartsName != null && x.PartsName.Contains(partsName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.Line))
+        {
+            var line = criteria.Line.Trim();
+            query = query.Where(x => x.Line != null && x.Line.Contains(line));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.Lane))
+        {
+            var lane = criteria.Lane.Trim();
+            query = query.Where(x => x.Lane != null && x.Lane.Contains(lane));
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.ErrorName))
+        {
+            var errorName = criteria.ErrorName.Trim();
+            query = query.Where(x => x.ErrorName != null && x.ErrorName.Contains(errorName));
+        }
+
+        return query;
     }
 
     private static IQueryable<RetryLogEntry> ApplyRealErrorFilter(IQueryable<RetryLogEntry> query)

@@ -136,6 +136,10 @@
                             <input asp-for="PartFilter.Line" class="form-control" placeholder="VD: L1" />
                         </div>
                         <div class="col-md-2">
+                            <label asp-for="PartFilter.Lane" class="form-label">Lane</label>
+                            <input asp-for="PartFilter.Lane" class="form-control" placeholder="VD: 1" />
+                        </div>
+                        <div class="col-md-2">
                             <label asp-for="PartFilter.Machine" class="form-label">Máy</label>
                             <input asp-for="PartFilter.Machine" class="form-control" placeholder="VD: G" />
                         </div>
@@ -381,9 +385,26 @@
 
         }
 
-        <div class="card shadow-sm mb-4" id="retrylog-summary">
-            <div class="card-body">
-                <h2 class="h5 card-title mb-3">Lọc tổng hợp RetryLog</h2>
+        @if (Model.ShowExpensiveParts)
+        {
+            <div class="card shadow-sm mb-5">
+                <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <h2 class="h5 mb-1">Dữ liệu RetryLog ngày @Model.SelectedDate</h2>
+                        <p class="text-muted small mb-0">Phần dữ liệu all chỉ được tải khi cần để trang LKĐT lọc nhanh hơn.</p>
+                    </div>
+                    <a asp-page="./DataByDate"
+                       asp-route-SelectedDate="@Model.SelectedDate"
+                       asp-route-SearchDate="@Model.SearchDate"
+                       class="btn btn-outline-primary">Xem dữ liệu RetryLog</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card shadow-sm mb-4" id="retrylog-summary">
+                <div class="card-body">
+                    <h2 class="h5 card-title mb-3">Lọc tổng hợp RetryLog</h2>
                 <form method="get" class="row g-3">
                     <input type="hidden" asp-for="SelectedDate" />
                     <input type="hidden" asp-for="SearchDate" />
@@ -424,150 +445,151 @@
                         <a asp-page="./DataByDate" asp-route-SelectedDate="@Model.SelectedDate" asp-route-SearchDate="@Model.SearchDate" class="btn btn-outline-secondary">Xóa bộ lọc</a>
                     </div>
                 </form>
-            </div>
-        </div>
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                    <h2 class="h5 card-title mb-0">Tổng hợp lỗi RetryLog ngày @Model.SelectedDate</h2>
-                    <div class="d-flex gap-2">
-                        <a asp-page="./DataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
-                        <a asp-page="./DataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
-                    </div>
                 </div>
-                @if (Model.ErrorSummary.Count == 0)
-                {
-                    <div class="alert alert-warning mb-0">Không có dữ liệu phù hợp với bộ lọc.</div>
-                }
-                else
-                {
-                    <div class="table-responsive summary-table-wrapper">
-                        <table class="table table-sm table-striped table-hover align-middle mb-0">
-                            <thead class="table-dark">
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                        <h2 class="h5 card-title mb-0">Tổng hợp lỗi RetryLog ngày @Model.SelectedDate</h2>
+                        <div class="d-flex gap-2">
+                            <a asp-page="./DataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Csv")' class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                            <a asp-page="./DataByDate" asp-page-handler="Export" asp-all-route-data='@Model.GetExportRouteValues("Summary", "Xlsx")' class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
+                        </div>
+                    </div>
+                    @if (Model.ErrorSummary.Count == 0)
+                    {
+                        <div class="alert alert-warning mb-0">Không có dữ liệu phù hợp với bộ lọc.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive summary-table-wrapper">
+                            <table class="table table-sm table-striped table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Error No.</th><th>Error Name</th><th>Line</th><th>Lane</th><th>Table</th><th>Parts Name</th><th class="text-end">Số lần</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.ErrorSummary)
+                                    {
+                                        <tr>
+                                            <td>@item.ErrorNo</td>
+                                            <td class="error-name-cell"><span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span></td>
+                                            <td>@item.Lines</td>
+                                            <td>@item.Lanes</td>
+                                            <td>@item.Tables</td>
+                                            <td>@item.PartsNames</td>
+                                            <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary fw-semibold">
+                                        <td colspan="6">Tổng cộng (đã lọc)</td>
+                                        <td class="text-end">@Model.ErrorSummary.Sum(item => item.Count).ToString("N0")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h2 class="h5 card-title mb-1">Dữ liệu ngày @Model.SelectedDate</h2>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a asp-page="./DataByDate"
+                               asp-page-handler="Export"
+                               asp-all-route-data='@Model.GetExportRouteValues("Logs", "Csv")'
+                               class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
+                            <a asp-page="./DataByDate"
+                               asp-page-handler="Export"
+                               asp-all-route-data='@Model.GetExportRouteValues("Logs", "Xlsx")'
+                               class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
+                            <form method="post"
+                                  asp-page-handler="Delete"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Bạn chắc chắn muốn xóa toàn bộ dữ liệu retryLog ngày @Model.SelectedDate khỏi CSDL?');">
+                                <input type="hidden" asp-for="SelectedDate" />
+                                <input type="hidden" asp-for="SearchDate" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Xóa ngày này</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive log-table-wrapper">
+                        <table class="table table-sm table-bordered table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
                                 <tr>
-                                    <th>Error No.</th><th>Error Name</th><th>Line</th><th>Lane</th><th>Table</th><th>Parts Name</th><th class="text-end">Số lần</th>
+                                    <th>Date</th>
+                                    <th>Line</th>
+                                    <th>Occurrence Time</th>
+                                    <th>Error No.</th>
+                                    <th>Error Name</th>
+                                    <th>Lane</th>
+                                    <th>Table</th>
+                                    <th>Parts No.</th>
+                                    <th>Parts Name</th>
+                                    <th>Head No.</th>
+                                    <th>Nozzle Type</th>
+                                    <th>Feeder No.</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var item in Model.ErrorSummary)
+                                @foreach (var row in Model.Entries)
                                 {
                                     <tr>
-                                        <td>@item.ErrorNo</td>
-                                        <td class="error-name-cell"><span class="@IndexModel.GetErrorNameCssClass(item.ErrorName)">@item.ErrorName</span></td>
-                                        <td>@item.Lines</td>
-                                        <td>@item.Lanes</td>
-                                        <td>@item.Tables</td>
-                                        <td>@item.PartsNames</td>
-                                        <td class="text-end fw-semibold">@item.Count.ToString("N0")</td>
+                                        <td>@row.Date</td>
+                                        <td>@row.Line</td>
+                                        <td>@row.OccurrenceTime</td>
+                                        <td>@row.ErrorNo</td>
+                                        <td class="error-name-cell">
+                                            @if (string.IsNullOrWhiteSpace(row.ErrorName))
+                                            {
+                                                <span class="error-name-tag error-name-empty">—</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="@IndexModel.GetErrorNameCssClass(row.ErrorName)">@row.ErrorName</span>
+                                            }
+                                        </td>
+                                        <td>@row.Lane</td>
+                                        <td>@row.Table</td>
+                                        <td>@row.PartsNo</td>
+                                        <td>@row.PartsName</td>
+                                        <td>@row.HeadNo</td>
+                                        <td>@row.NozzleType</td>
+                                        <td>@row.FeederNo</td>
                                     </tr>
                                 }
                             </tbody>
-                            <tfoot>
-                                <tr class="table-secondary fw-semibold">
-                                    <td colspan="6">Tổng cộng (đã lọc)</td>
-                                    <td class="text-end">@Model.ErrorSummary.Sum(item => item.Count).ToString("N0")</td>
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
-                }
-            </div>
-        </div>
 
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                    <div>
-                        <h2 class="h5 card-title mb-1">Dữ liệu ngày @Model.SelectedDate</h2>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <a asp-page="./DataByDate"
-                           asp-page-handler="Export"
-                           asp-all-route-data='@Model.GetExportRouteValues("Logs", "Csv")'
-                           class="btn btn-outline-success btn-sm">T&#7843;i CSV</a>
-                        <a asp-page="./DataByDate"
-                           asp-page-handler="Export"
-                           asp-all-route-data='@Model.GetExportRouteValues("Logs", "Xlsx")'
-                           class="btn btn-outline-success btn-sm">T&#7843;i Excel</a>
-                        <form method="post"
-                              asp-page-handler="Delete"
-                              class="d-inline"
-                              onsubmit="return confirm('Bạn chắc chắn muốn xóa toàn bộ dữ liệu retryLog ngày @Model.SelectedDate khỏi CSDL?');">
-                            <input type="hidden" asp-for="SelectedDate" />
-                            <input type="hidden" asp-for="SearchDate" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Xóa ngày này</button>
-                        </form>
-                    </div>
+                    @if (Model.TotalPages > 1)
+                    {
+                        <nav class="mt-3" aria-label="Phân trang dữ liệu theo ngày">
+                            <ul class="pagination pagination-sm justify-content-center mb-0">
+                                <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : "")">
+                                    <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetRouteValues(Model.PageNumber - 1)">Trước</a>
+                                </li>
+                                <li class="page-item disabled">
+                                    <span class="page-link">Trang @Model.PageNumber / @Model.TotalPages</span>
+                                </li>
+                                <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                                    <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetRouteValues(Model.PageNumber + 1)">Sau</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    }
                 </div>
-
-                <div class="table-responsive log-table-wrapper">
-                    <table class="table table-sm table-bordered table-hover align-middle mb-0">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th>Date</th>
-                                <th>Line</th>
-                                <th>Occurrence Time</th>
-                                <th>Error No.</th>
-                                <th>Error Name</th>
-                                <th>Lane</th>
-                                <th>Table</th>
-                                <th>Parts No.</th>
-                                <th>Parts Name</th>
-                                <th>Head No.</th>
-                                <th>Nozzle Type</th>
-                                <th>Feeder No.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var row in Model.Entries)
-                            {
-                                <tr>
-                                    <td>@row.Date</td>
-                                    <td>@row.Line</td>
-                                    <td>@row.OccurrenceTime</td>
-                                    <td>@row.ErrorNo</td>
-                                    <td class="error-name-cell">
-                                        @if (string.IsNullOrWhiteSpace(row.ErrorName))
-                                        {
-                                            <span class="error-name-tag error-name-empty">—</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="@IndexModel.GetErrorNameCssClass(row.ErrorName)">@row.ErrorName</span>
-                                        }
-                                    </td>
-                                    <td>@row.Lane</td>
-                                    <td>@row.Table</td>
-                                    <td>@row.PartsNo</td>
-                                    <td>@row.PartsName</td>
-                                    <td>@row.HeadNo</td>
-                                    <td>@row.NozzleType</td>
-                                    <td>@row.FeederNo</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-
-                @if (Model.TotalPages > 1)
-                {
-                    <nav class="mt-3" aria-label="Phân trang dữ liệu theo ngày">
-                        <ul class="pagination pagination-sm justify-content-center mb-0">
-                            <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : "")">
-                                <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetRouteValues(Model.PageNumber - 1)">Trước</a>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link">Trang @Model.PageNumber / @Model.TotalPages</span>
-                            </li>
-                            <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
-                                <a class="page-link" asp-page="./DataByDate" asp-all-route-data="@Model.GetRouteValues(Model.PageNumber + 1)">Sau</a>
-                            </li>
-                        </ul>
-                    </nav>
-                }
             </div>
-        </div>
+        }
     }
 </div>
 
