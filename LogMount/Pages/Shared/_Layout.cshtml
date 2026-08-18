@@ -24,6 +24,9 @@
         var isErrorLogDataByDatePage = currentPage.Equals("/ErrorLogDataByDate", StringComparison.OrdinalIgnoreCase);
         var isErrorLogDataByMonthPage = currentPage.Equals("/ErrorLogDataByMonth", StringComparison.OrdinalIgnoreCase);
         var isErrorLogPage = isErrorLogDashboardPage || isErrorLogAnalysisPage || isErrorLogImprovementPage || isErrorLogDataByDatePage || isErrorLogDataByMonthPage;
+        var isRequestLogPage = currentPage.Equals("/RequestLog", StringComparison.OrdinalIgnoreCase) ||
+                               currentPage.Equals("/RequestLogDataByDate", StringComparison.OrdinalIgnoreCase) ||
+                               currentPage.Equals("/RequestLogDataByMonth", StringComparison.OrdinalIgnoreCase);
         var canEdit = User.IsInRole("Staff") || User.IsInRole("Admin");
         var profileInitial = string.IsNullOrWhiteSpace(User.Identity?.Name) ? "?" : User.Identity!.Name![..1].ToUpperInvariant();
     }
@@ -78,6 +81,25 @@
                             <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
                         </a>
                         <a class="sidebar-link sidebar-sublink @(isErrorLogDataByMonthPage ? "active" : "")" asp-area="" asp-page="/ErrorLogDataByMonth">
+                            <span class="sidebar-link-title">Xem dữ liệu theo tháng</span>
+                        </a>
+                    </div>
+                </details>
+                <details class="sidebar-group" @(isRequestLogPage ? "open" : "")>
+                    <summary class="sidebar-link sidebar-group-toggle @(isRequestLogPage ? "active" : "")">
+                        <span>
+                            <span class="sidebar-link-title">RequestLog</span>
+                            <span class="sidebar-link-subtitle">Yêu cầu linh kiện bị rơi</span>
+                        </span>
+                    </summary>
+                    <div class="sidebar-subnav">
+                        <a class="sidebar-link sidebar-sublink @(currentPage.Equals("/RequestLog", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-area="" asp-page="/RequestLog">
+                            <span class="sidebar-link-title">Tải lên &amp; tổng hợp</span>
+                        </a>
+                        <a class="sidebar-link sidebar-sublink @(currentPage.Equals("/RequestLogDataByDate", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-area="" asp-page="/RequestLogDataByDate">
+                            <span class="sidebar-link-title">Xem dữ liệu theo ngày</span>
+                        </a>
+                        <a class="sidebar-link sidebar-sublink @(currentPage.Equals("/RequestLogDataByMonth", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-area="" asp-page="/RequestLogDataByMonth">
                             <span class="sidebar-link-title">Xem dữ liệu theo tháng</span>
                         </a>
                     </div>

@@ -1,0 +1,25 @@
+@page "/RequestLog/DataByMonth"
+@model RequestLogDataByMonthModel
+@{
+    ViewData["Title"] = "RequestLog theo tháng";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4"><h1 class="h2 mb-1">Xem RequestLog theo tháng</h1><p class="text-muted mb-0">Tổng hợp P/N cho toàn bộ dữ liệu trong tháng đã chọn.</p></div>
+    @if (Model.AvailableMonths.Count == 0) { <div class="alert alert-warning">Chưa có dữ liệu RequestLog trong CSDL.</div> }
+    else {
+        <div class="card shadow-sm mb-4"><div class="card-body"><form method="get" class="row g-3 align-items-end">
+            <div class="col-md-2"><label asp-for="SelectedMonth" class="form-label">Tháng</label><select asp-for="SelectedMonth" class="form-select">@foreach (var month in Model.AvailableMonths) { <option value="@month">@month</option> }</select></div>
+            <div class="col-md-2"><label asp-for="DateFrom" class="form-label">Từ ngày</label><input asp-for="DateFrom" type="date" class="form-control" /></div>
+            <div class="col-md-2"><label asp-for="DateTo" class="form-label">Đến ngày</label><input asp-for="DateTo" type="date" class="form-control" /></div>
+            <div class="col-md-2"><label asp-for="Line" class="form-label">LINE</label><select asp-for="Line" class="form-select"><option value="">Tất cả</option>@foreach (var line in Model.AvailableLines) { <option value="@line">@line</option> }</select></div>
+            <div class="col-md-2"><label asp-for="PartNo" class="form-label">P/N</label><input asp-for="PartNo" class="form-control" /></div>
+            <div class="col-md-1"><label asp-for="TopN" class="form-label">Top</label><select asp-for="TopN" class="form-select"><option value="0">Tất cả</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></div>
+            <div class="col-md-3"><label asp-for="SortBy" class="form-label">Ưu tiên</label><select asp-for="SortBy" class="form-select"><option value="rqty">R.Q'ty cao nhất</option><option value="rate">Tỷ lệ rơi cao nhất</option><option value="amount">Tổng tiền cao nhất</option></select></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Xem dữ liệu</button></div>
+        </form></div></div>
+        <div class="card shadow-sm mb-4"><div class="card-body"><h2 class="h5 card-title">Top linh kiện tháng @Model.SelectedMonth</h2><div style="height:400px"><canvas id="requestMonthChart" aria-label="Biểu đồ RequestLog theo tháng"></canvas></div></div></div>
+        <partial name="_RequestLogSummary" model="Model.Summary" view-data='new ViewDataDictionary(ViewData) { { "TotalRows", Model.TotalRows } }' />
+    }
+</div>
+@section Scripts {<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script>var data=@Html.Raw(Model.ChartDataJson);if(data.length){new Chart(document.getElementById('requestMonthChart'),{data:{labels:data.map(x=>x.label),datasets:[{type:'bar',label:"Số lượng rơi",data:data.map(x=>x.requestQty),yAxisID:'qty',backgroundColor:'#4d80e8',order:2},{type:'line',label:'Tỷ lệ rơi (%)',data:data.map(x=>x.dropRate),yAxisID:'rate',borderColor:'red',backgroundColor:'red',pointBackgroundColor:'red',pointBorderColor:'white',pointBorderWidth:1,pointRadius:5,pointHoverRadius:7,borderWidth:3,order:0,clip:false}]},options:{responsive:true,maintainAspectRatio:false,scales:{qty:{beginAtZero:true},rate:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});}</script>}

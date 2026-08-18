@@ -64,7 +64,7 @@ public class RetryLogImprovementModel : PageModel
             return;
         }
 
-        // Query dropdown options only when user applies filters
+        // Query dropdown options with IMemoryCache
         AvailableLines = await GetFilterOptionsAsync(e => e.Line, "lines", cancellationToken);
         AvailableLanes = await GetFilterOptionsAsync(e => e.Lane, "lanes", cancellationToken);
         AvailableTables = await GetFilterOptionsAsync(e => e.Table, "tables", cancellationToken);
@@ -126,6 +126,67 @@ public class RetryLogImprovementModel : PageModel
             query = query.Where(e => e.ErrorNo != null && e.ErrorNo.Contains(errNo));
         }
 
+        // 3. TAB 3: RETRY IMPROVE HISTORY FILTERED BY TOP FILTERS
+        var impQuery = _dbContext.RetryImproves.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(Filter.FromDate))
+        {
+            if (DateTime.TryParse(Filter.FromDate, out var fromDt))
+            {
+                impQuery = impQuery.Where(x => x.ExecutionDate >= fromDt.Date);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.ToDate))
+        {
+            if (DateTime.TryParse(Filter.ToDate, out var toDt))
+            {
+                impQuery = impQuery.Where(x => x.ExecutionDate <= toDt.Date);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.PartsName))
+        {
+            var p = Filter.PartsName.Trim();
+            impQuery = impQuery.Where(x => x.PartsName != null && x.PartsName.Contains(p));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Line))
+        {
+            var l = Filter.Line.Trim();
+            impQuery = impQuery.Where(x => x.Line != null && x.Line.Contains(l));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Lane))
+        {
+            var lane = Filter.Lane.Trim();
+            impQuery = impQuery.Where(x => x.Lane != null && x.Lane.Contains(lane));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Side))
+        {
+            var side = Filter.Side.Trim().ToUpperInvariant();
+            if (side == "BOT" || side == "B")
+            {
+                impQuery = impQuery.Where(x => x.Side != null && (x.Side == "B" || x.Side.Contains("BOT") || x.Side.Contains("Bot") || x.Side.Contains("bot")));
+            }
+            else if (side == "TOP" || side == "T")
+            {
+                impQuery = impQuery.Where(x => x.Side != null && (x.Side == "T" || x.Side.Contains("TOP") || x.Side.Contains("Top") || x.Side.Contains("top")));
+            }
+            else
+            {
+                impQuery = impQuery.Where(x => x.Side != null && x.Side.Contains(side));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Machine))
+        {
+            var m = Filter.Machine.Trim();
+            impQuery = impQuery.Where(x => x.Machine != null && x.Machine.Contains(m));
+        }
+
+        // Execute EF queries sequentially to prevent DbContext thread safety errors
         var projectedList = await query
             .Select(e => new
             {
@@ -133,6 +194,17 @@ public class RetryLogImprovementModel : PageModel
                 e.LotName,
                 e.PartsName
             })
+            .ToListAsync(cancellationToken);
+
+        var expensivePartNames = await _dbContext.ExpensiveParts.AsNoTracking()
+            .Where(x => x.PartsName != null && x.PartsName != "")
+            .Select(x => x.PartsName!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        ImprovementHistoryItems = await impQuery
+            .OrderByDescending(x => x.ExecutionDate)
+            .ThenByDescending(x => x.Id)
             .ToListAsync(cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(Filter.Side))
@@ -216,12 +288,6 @@ public class RetryLogImprovementModel : PageModel
         ChartDailyJson = JsonSerializer.Serialize(chartDailyList, JsonOptions);
 
         // 2. TAB 2: EXPENSIVE PARTS DAILY TREND (Xu hướng LKDT theo ngày)
-        var expensivePartNames = await _dbContext.ExpensiveParts.AsNoTracking()
-            .Where(x => x.PartsName != null && x.PartsName != "")
-            .Select(x => x.PartsName!)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
         var expSet = new HashSet<string>(expensivePartNames, StringComparer.OrdinalIgnoreCase);
 
         var expensiveProjectedList = projectedList
@@ -286,60 +352,6 @@ public class RetryLogImprovementModel : PageModel
         }
         ExpensiveDailyItems = expDailyItemList;
         ChartExpensiveDailyJson = JsonSerializer.Serialize(chartExpDailyList, JsonOptions);
-
-        // 3. TAB 3: RETRY IMPROVE HISTORY FILTERED BY TOP FILTERS
-        var impQuery = _dbContext.RetryImproves.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(Filter.FromDate))
-        {
-            if (DateTime.TryParse(Filter.FromDate, out var fromDt))
-            {
-                impQuery = impQuery.Where(x => x.ExecutionDate >= fromDt.Date);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.ToDate))
-        {
-            if (DateTime.TryParse(Filter.ToDate, out var toDt))
-            {
-                impQuery = impQuery.Where(x => x.ExecutionDate <= toDt.Date);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.PartsName))
-        {
-            var p = Filter.PartsName.Trim();
-            impQuery = impQuery.Where(x => x.PartsName != null && x.PartsName.Contains(p));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Line))
-        {
-            var l = Filter.Line.Trim();
-            impQuery = impQuery.Where(x => x.Line != null && x.Line.Contains(l));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Lane))
-        {
-            var lane = Filter.Lane.Trim();
-            impQuery = impQuery.Where(x => x.Lane != null && x.Lane.Contains(lane));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Side))
-        {
-            var side = Filter.Side.Trim();
-            impQuery = impQuery.Where(x => x.Side != null && x.Side.Contains(side));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Machine))
-        {
-            var m = Filter.Machine.Trim();
-            impQuery = impQuery.Where(x => x.Machine != null && x.Machine.Contains(m));
-        }
-
-        ImprovementHistoryItems = await impQuery
-            .OrderByDescending(x => x.ExecutionDate)
-            .ThenByDescending(x => x.Id)
-            .ToListAsync(cancellationToken);
     }
 
     private static string NormalizeDateString(string? dateStr)

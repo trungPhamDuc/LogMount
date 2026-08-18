@@ -121,6 +121,14 @@
                         <input asp-for="Filter.Table" class="form-control" placeholder="VD: A" />
                     </div>
                     <div class="col-md-2">
+                        <label asp-for="Filter.DateFrom" class="form-label">Từ ngày</label>
+                        <input asp-for="Filter.DateFrom" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.DateTo" class="form-label">Đến ngày</label>
+                        <input asp-for="Filter.DateTo" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
                         <label asp-for="Filter.TimeFrom" class="form-label">Từ giờ</label>
                         <input asp-for="Filter.TimeFrom" type="time" class="form-control" />
                     </div>

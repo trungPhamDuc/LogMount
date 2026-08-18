@@ -93,15 +93,17 @@ public class ErrorLogImprovementModel : PageModel
         if (!string.IsNullOrWhiteSpace(Filter.FromDate))
         {
             var from = Filter.FromDate.Trim().Replace('/', '-');
-            query = query.Where(e => (e.Date != null && e.Date.Replace("/", "-").CompareTo(from) >= 0) ||
-                                     (e.EventDate != null && e.EventDate.Replace("/", "-").CompareTo(from) >= 0));
+            var fromSlash = from.Replace('-', '/');
+            query = query.Where(e => (e.Date != null && (e.Date.CompareTo(from) >= 0 || e.Date.CompareTo(fromSlash) >= 0)) ||
+                                     (e.EventDate != null && (e.EventDate.CompareTo(from) >= 0 || e.EventDate.CompareTo(fromSlash) >= 0)));
         }
 
         if (!string.IsNullOrWhiteSpace(Filter.ToDate))
         {
             var to = Filter.ToDate.Trim().Replace('/', '-');
-            query = query.Where(e => (e.Date != null && e.Date.Replace("/", "-").CompareTo(to) <= 0) ||
-                                     (e.EventDate != null && e.EventDate.Replace("/", "-").CompareTo(to) <= 0));
+            var toSlash = to.Replace('-', '/');
+            query = query.Where(e => (e.Date != null && (e.Date.CompareTo(to) <= 0 || e.Date.CompareTo(toSlash) <= 0)) ||
+                                     (e.EventDate != null && (e.EventDate.CompareTo(to) <= 0 || e.EventDate.CompareTo(toSlash) <= 0)));
         }
 
         if (!string.IsNullOrWhiteSpace(Filter.Error))
@@ -130,6 +132,67 @@ public class ErrorLogImprovementModel : PageModel
             query = query.Where(e => e.Table != null && e.Table.Contains(tbl));
         }
 
+        // 3. TAB 3: ERROR IMPROVE HISTORY FILTERED BY TOP FILTERS
+        var impQuery = _dbContext.ErrorImproves.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(Filter.FromDate))
+        {
+            if (DateTime.TryParse(Filter.FromDate, out var fromDt))
+            {
+                impQuery = impQuery.Where(x => x.ExecutionDate >= fromDt.Date);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.ToDate))
+        {
+            if (DateTime.TryParse(Filter.ToDate, out var toDt))
+            {
+                impQuery = impQuery.Where(x => x.ExecutionDate <= toDt.Date);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Error))
+        {
+            var err = Filter.Error.Trim();
+            impQuery = impQuery.Where(x => x.Error != null && x.Error.Contains(err));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Line))
+        {
+            var l = Filter.Line.Trim();
+            impQuery = impQuery.Where(x => x.Line != null && x.Line.Contains(l));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Lane))
+        {
+            var lane = Filter.Lane.Trim();
+            impQuery = impQuery.Where(x => x.Lane != null && x.Lane.Contains(lane));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Side))
+        {
+            var side = Filter.Side.Trim().ToUpperInvariant();
+            if (side == "BOT" || side == "B")
+            {
+                impQuery = impQuery.Where(x => x.Side != null && (x.Side == "B" || x.Side.Contains("BOT") || x.Side.Contains("Bot") || x.Side.Contains("bot")));
+            }
+            else if (side == "TOP" || side == "T")
+            {
+                impQuery = impQuery.Where(x => x.Side != null && (x.Side == "T" || x.Side.Contains("TOP") || x.Side.Contains("Top") || x.Side.Contains("top")));
+            }
+            else
+            {
+                impQuery = impQuery.Where(x => x.Side != null && x.Side.Contains(side));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Machine))
+        {
+            var m = Filter.Machine.Trim();
+            impQuery = impQuery.Where(x => x.Machine != null && x.Machine.Contains(m));
+        }
+
+        // Fetch projectedList and impHistory sequentially to prevent DbContext threading errors
         var projectedList = await query
             .Select(e => new
             {
@@ -137,6 +200,11 @@ public class ErrorLogImprovementModel : PageModel
                 e.ProgramName,
                 e.Error
             })
+            .ToListAsync(cancellationToken);
+
+        ImprovementHistoryItems = await impQuery
+            .OrderByDescending(x => x.ExecutionDate)
+            .ThenByDescending(x => x.Id)
             .ToListAsync(cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(Filter.Side))
@@ -261,60 +329,6 @@ public class ErrorLogImprovementModel : PageModel
         }
         DailyItems = dailyItemList;
         ChartDailyJson = JsonSerializer.Serialize(chartDailyList, JsonOptions);
-
-        // 3. TAB 3: ERROR IMPROVE HISTORY FILTERED BY TOP FILTERS
-        var impQuery = _dbContext.ErrorImproves.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(Filter.FromDate))
-        {
-            if (DateTime.TryParse(Filter.FromDate, out var fromDt))
-            {
-                impQuery = impQuery.Where(x => x.ExecutionDate >= fromDt.Date);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.ToDate))
-        {
-            if (DateTime.TryParse(Filter.ToDate, out var toDt))
-            {
-                impQuery = impQuery.Where(x => x.ExecutionDate <= toDt.Date);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Error))
-        {
-            var err = Filter.Error.Trim();
-            impQuery = impQuery.Where(x => x.Error != null && x.Error.Contains(err));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Line))
-        {
-            var l = Filter.Line.Trim();
-            impQuery = impQuery.Where(x => x.Line != null && x.Line.Contains(l));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Lane))
-        {
-            var lane = Filter.Lane.Trim();
-            impQuery = impQuery.Where(x => x.Lane != null && x.Lane.Contains(lane));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Side))
-        {
-            var side = Filter.Side.Trim();
-            impQuery = impQuery.Where(x => x.Side != null && x.Side.Contains(side));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Machine))
-        {
-            var m = Filter.Machine.Trim();
-            impQuery = impQuery.Where(x => x.Machine != null && x.Machine.Contains(m));
-        }
-
-        ImprovementHistoryItems = await impQuery
-            .OrderByDescending(x => x.ExecutionDate)
-            .ThenByDescending(x => x.Id)
-            .ToListAsync(cancellationToken);
     }
 
     private static string NormalizeDateString(string? dateStr)

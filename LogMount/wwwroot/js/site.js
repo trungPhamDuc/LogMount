@@ -44,9 +44,9 @@ window.loadRetryImproveHistory = function() {
                 var dateStr = item.executionDate ? new Date(item.executionDate).toLocaleDateString('vi-VN') : '';
                 var isoDate = item.executionDate ? item.executionDate.substring(0, 10) : '';
                 var jsonAttr = JSON.stringify(item).replace(/'/g, "&apos;");
-                html += '<tr style="cursor: pointer;" data-json=\'' + jsonAttr + '\' onclick="onRetryRowClick(event, this)">' +
+                html += '<tr data-json=\'' + jsonAttr + '\'>' +
                     '<td class="fw-bold text-success">' + dateStr + '</td>' +
-                    '<td class="fw-bold text-primary">' + (item.partsName || '') + '</td>' +
+                    '<td class="fw-bold text-primary"><a href="javascript:void(0)" onclick="onPartsNameClick(event, this)" class="text-primary text-decoration-underline" title="Click để lọc theo linh kiện này">' + (item.partsName || '') + '</a></td>' +
                     '<td>' + (item.line || '') + '</td>' +
                     '<td>' + (item.lane || '') + '</td>' +
                     '<td>' + (item.side || '') + '</td>' +
@@ -277,8 +277,10 @@ window.onEditRetryBtnClick = function(event, btn) {
     );
 };
 
-window.onRetryRowClick = function(event, tr) {
-    if (event.target.closest('button') || event.target.closest('a')) return;
+window.onPartsNameClick = function(event, el) {
+    if (event) event.stopPropagation();
+    var tr = el ? el.closest('tr') : null;
+    if (!tr) return;
     var jsonStr = tr.getAttribute('data-json');
     if (!jsonStr) return;
     var item = JSON.parse(jsonStr);
@@ -290,18 +292,31 @@ window.onRetryRowClick = function(event, tr) {
     var lineEl = document.querySelector('input[name="Filter.Line"]');
     var laneEl = document.querySelector('input[name="Filter.Lane"]');
     var sideEl = document.querySelector('select[name="Filter.Side"]');
+    var machineEl = document.querySelector('input[name="Filter.Machine"]');
 
-    if (fromDateEl) fromDateEl.value = isoDate;
-    if (toDateEl) toDateEl.value = isoDate;
-    if (partsNameEl) partsNameEl.value = item.partsName || item.PartsName || '';
-    if (lineEl) lineEl.value = item.line || item.Line || '';
-    if (laneEl) laneEl.value = item.lane || item.Lane || '';
-    if (sideEl) {
-        var s = (item.side || item.Side || '').toUpperCase();
-        if (s === 'T' || s === 'TOP') sideEl.value = 'TOP';
-        else if (s === 'B' || s === 'BOT') sideEl.value = 'BOT';
-        else sideEl.value = s;
+    if (isoDate) {
+        if (fromDateEl) fromDateEl.value = isoDate;
+        if (toDateEl) {
+            var parts = isoDate.split('-');
+            if (parts.length === 3) {
+                var dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                dt.setDate(dt.getDate() + 3);
+                var yyyy = dt.getFullYear();
+                var mm = String(dt.getMonth() + 1).padStart(2, '0');
+                var dd = String(dt.getDate()).padStart(2, '0');
+                toDateEl.value = yyyy + '-' + mm + '-' + dd;
+            } else {
+                toDateEl.value = isoDate;
+            }
+        }
     }
+    if (partsNameEl) partsNameEl.value = item.partsName || item.PartsName || '';
+    
+    // Clear Line, Lane, Side, Machine as requested
+    if (lineEl) lineEl.value = '';
+    if (laneEl) laneEl.value = '';
+    if (sideEl) sideEl.value = '';
+    if (machineEl) machineEl.value = '';
 
     var form = fromDateEl ? fromDateEl.closest('form') : document.querySelector('form');
     if (form) {
@@ -331,8 +346,10 @@ window.onEditErrorBtnClick = function(event, btn) {
     );
 };
 
-window.onErrorRowClick = function(event, tr) {
-    if (event.target.closest('button') || event.target.closest('a')) return;
+window.onErrorNameClick = function(event, el) {
+    if (event) event.stopPropagation();
+    var tr = el ? el.closest('tr') : null;
+    if (!tr) return;
     var jsonStr = tr.getAttribute('data-json');
     if (!jsonStr) return;
     var item = JSON.parse(jsonStr);
@@ -344,18 +361,31 @@ window.onErrorRowClick = function(event, tr) {
     var lineEl = document.querySelector('input[name="Filter.Line"]');
     var laneEl = document.querySelector('input[name="Filter.Lane"]');
     var sideEl = document.querySelector('select[name="Filter.Side"]');
+    var machineEl = document.querySelector('input[name="Filter.Machine"]');
 
-    if (fromDateEl) fromDateEl.value = isoDate;
-    if (toDateEl) toDateEl.value = isoDate;
-    if (errorEl) errorEl.value = item.error || item.Error || '';
-    if (lineEl) lineEl.value = item.line || item.Line || '';
-    if (laneEl) laneEl.value = item.lane || item.Lane || '';
-    if (sideEl) {
-        var s = (item.side || item.Side || '').toUpperCase();
-        if (s === 'T' || s === 'TOP') sideEl.value = 'TOP';
-        else if (s === 'B' || s === 'BOT') sideEl.value = 'BOT';
-        else sideEl.value = s;
+    if (isoDate) {
+        if (fromDateEl) fromDateEl.value = isoDate;
+        if (toDateEl) {
+            var parts = isoDate.split('-');
+            if (parts.length === 3) {
+                var dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                dt.setDate(dt.getDate() + 3);
+                var yyyy = dt.getFullYear();
+                var mm = String(dt.getMonth() + 1).padStart(2, '0');
+                var dd = String(dt.getDate()).padStart(2, '0');
+                toDateEl.value = yyyy + '-' + mm + '-' + dd;
+            } else {
+                toDateEl.value = isoDate;
+            }
+        }
     }
+    if (errorEl) errorEl.value = item.error || item.Error || '';
+    
+    // Clear Line, Lane, Side, Machine as requested
+    if (lineEl) lineEl.value = '';
+    if (laneEl) laneEl.value = '';
+    if (sideEl) sideEl.value = '';
+    if (machineEl) machineEl.value = '';
 
     var form = fromDateEl ? fromDateEl.closest('form') : document.querySelector('form');
     if (form) {

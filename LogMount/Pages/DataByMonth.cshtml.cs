@@ -243,9 +243,12 @@ public class DataByMonthModel : PageModel
             ["PartPageNumber"] = PartPageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Lane"] = PartFilter.Lane,
             ["PartFilter.Machine"] = PartFilter.Machine,
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
+            ["PartFilter.DateFrom"] = PartFilter.DateFrom,
+            ["PartFilter.DateTo"] = PartFilter.DateTo,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
@@ -278,9 +281,12 @@ public class DataByMonthModel : PageModel
             ["PartPageNumber"] = pageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Lane"] = PartFilter.Lane,
             ["PartFilter.Machine"] = PartFilter.Machine,
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
+            ["PartFilter.DateFrom"] = PartFilter.DateFrom,
+            ["PartFilter.DateTo"] = PartFilter.DateTo,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = "true"
@@ -303,9 +309,12 @@ public class DataByMonthModel : PageModel
             ["PartPageNumber"] = PartPageNumber.ToString(),
             ["PartFilter.PartsName"] = PartFilter.PartsName,
             ["PartFilter.Line"] = PartFilter.Line,
+            ["PartFilter.Lane"] = PartFilter.Lane,
             ["PartFilter.Machine"] = PartFilter.Machine,
             ["PartFilter.Shift"] = PartFilter.Shift,
             ["PartFilter.ErrorName"] = PartFilter.ErrorName,
+            ["PartFilter.DateFrom"] = PartFilter.DateFrom,
+            ["PartFilter.DateTo"] = PartFilter.DateTo,
             ["PartFilter.SortDirection"] = PartFilter.SortDirection,
             ["TopN"] = TopN.ToString(),
             ["ShowExpensiveParts"] = ShowExpensiveParts.ToString()
@@ -325,6 +334,8 @@ public class DataByMonthModel : PageModel
         values["Filter.PartsName"] = Filter.PartsName;
         values["Filter.TimeFrom"] = Filter.TimeFrom;
         values["Filter.TimeTo"] = Filter.TimeTo;
+        values["Filter.DateFrom"] = Filter.DateFrom;
+        values["Filter.DateTo"] = Filter.DateTo;
     }
 
     private async Task LoadExpensivePartSummaryAsync(
@@ -394,7 +405,7 @@ public class DataByMonthModel : PageModel
 
         selectedMonthQuery ??= BuildMonthQuery(selectedMonth);
 
-        var entries = await selectedMonthQuery
+        var entries = await ApplyDateRange(selectedMonthQuery, PartFilter.DateFrom, PartFilter.DateTo)
             .Where(entry => entry.PartsName != null &&
                             expensivePartNames.Contains(entry.PartsName))
             .ToListAsync(cancellationToken);
@@ -484,6 +495,26 @@ public class DataByMonthModel : PageModel
         {
             var partsName = criteria.PartsName.Trim();
             query = query.Where(x => x.PartsName != null && x.PartsName.Contains(partsName));
+        }
+
+        return ApplyDateRange(query, criteria.DateFrom, criteria.DateTo);
+    }
+
+    private static IQueryable<RetryLogEntry> ApplyDateRange(
+        IQueryable<RetryLogEntry> query,
+        string? dateFrom,
+        string? dateTo)
+    {
+        if (!string.IsNullOrWhiteSpace(dateFrom))
+        {
+            var from = dateFrom.Trim().Replace('-', '/');
+            query = query.Where(x => x.Date != null && string.Compare(x.Date, from) >= 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(dateTo))
+        {
+            var to = dateTo.Trim().Replace('-', '/');
+            query = query.Where(x => x.Date != null && string.Compare(x.Date, to) <= 0);
         }
 
         return query;

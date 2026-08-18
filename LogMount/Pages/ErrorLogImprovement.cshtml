@@ -351,9 +351,11 @@
                                         @foreach (var item in Model.ImprovementHistoryItems)
                                         {
                                             var jsonStr = System.Text.Json.JsonSerializer.Serialize(item);
-                                            <tr style="cursor: pointer;" data-json='@Html.Raw(jsonStr)' onclick="onErrorRowClick(event, this)" title="Click để lọc biểu đồ theo bản ghi này">
+                                            <tr data-json='@Html.Raw(jsonStr)'>
                                                 <td class="fw-bold text-success">@item.ExecutionDate.ToString("dd/MM/yyyy")</td>
-                                                <td class="fw-bold text-danger">@item.Error</td>
+                                                <td class="fw-bold text-danger">
+                                                    <a href="javascript:void(0)" onclick="onErrorNameClick(event, this)" class="text-danger text-decoration-underline" title="Click để lọc theo tên lỗi này">@item.Error</a>
+                                                </td>
                                                 <td>@item.Line</td>
                                                 <td>@item.Lane</td>
                                                 <td>@item.Side</td>

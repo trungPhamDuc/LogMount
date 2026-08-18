@@ -398,9 +398,11 @@
                                         {
                                             var jsonStr = System.Text.Json.JsonSerializer.Serialize(item);
                                             var displayErrorName = item.ErrorName ?? string.Empty;
-                                            <tr style="cursor: pointer;" data-json='@Html.Raw(jsonStr)' onclick="onRetryRowClick(event, this)" title="Click để lọc biểu đồ theo bản ghi này">
+                                            <tr data-json='@Html.Raw(jsonStr)'>
                                                 <td class="fw-bold text-success">@item.ExecutionDate.ToString("dd/MM/yyyy")</td>
-                                                <td class="fw-bold text-primary">@item.PartsName</td>
+                                                <td class="fw-bold text-primary">
+                                                    <a href="javascript:void(0)" onclick="onPartsNameClick(event, this)" class="text-primary text-decoration-underline" title="Click để lọc theo linh kiện này">@item.PartsName</a>
+                                                </td>
                                                 <td>@item.Line</td>
                                                 <td>@item.Lane</td>
                                                 <td>@item.Side</td>

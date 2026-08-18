@@ -30,9 +30,6 @@ public class ErrorLogAutoImportService : BackgroundService
             return;
         }
 
-        // Run an immediate import on startup so data is generated right away without waiting
-        await ImportTodayAsync(stoppingToken);
-
         while (!stoppingToken.IsCancellationRequested)
         {
             var now = DateTime.Now;
@@ -191,7 +188,7 @@ public class ErrorLogAutoImportService : BackgroundService
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch (Exception ex)
+        catch (Exception ex) 
         {
             _logger.LogError(ex, "Previous day error log reimport failed.");
         }

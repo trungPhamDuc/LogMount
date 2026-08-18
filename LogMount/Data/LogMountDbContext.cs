@@ -17,6 +17,7 @@ public class LogMountDbContext : DbContext
     public DbSet<RetryImprove> RetryImproves => Set<RetryImprove>();
     public DbSet<ErrorImprove> ErrorImproves => Set<ErrorImprove>();
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<RequestLogEntry> RequestLogEntries => Set<RequestLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -91,6 +92,37 @@ public class LogMountDbContext : DbContext
                 .IsDescending(false, true, false);
             entity.HasIndex(x => x.Error);
             entity.HasIndex(x => x.Line);
+            entity.HasIndex(x => x.UploadedAt);
+        });
+
+        modelBuilder.Entity<RequestLogEntry>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Date).HasMaxLength(50);
+            entity.Property(x => x.Shift).HasMaxLength(20);
+            entity.Property(x => x.Line).HasMaxLength(50);
+            entity.Property(x => x.Process).HasMaxLength(100);
+            entity.Property(x => x.ModelSuffix).HasMaxLength(255);
+            entity.Property(x => x.Chassis).HasMaxLength(255);
+            entity.Property(x => x.Board).HasMaxLength(100);
+            entity.Property(x => x.PartAssy).HasMaxLength(255);
+            entity.Property(x => x.WorkOrder).HasMaxLength(255);
+            entity.Property(x => x.PartNo).HasMaxLength(255);
+            entity.Property(x => x.PidOrLot).HasMaxLength(255);
+            entity.Property(x => x.Unit).HasMaxLength(50);
+            entity.Property(x => x.PQty).HasColumnType("decimal(18, 3)");
+            entity.Property(x => x.RQty).HasColumnType("decimal(18, 3)");
+            entity.Property(x => x.AmtOnRequest).HasColumnType("decimal(18, 2)");
+            entity.Property(x => x.Remarks).HasMaxLength(1000);
+            entity.Property(x => x.Department).HasMaxLength(255);
+            entity.Property(x => x.StatusRemarks).HasMaxLength(1000);
+            entity.Property(x => x.SourceFileName).HasMaxLength(255);
+            entity.Property(x => x.UploadBatchId).HasMaxLength(50);
+
+            entity.HasIndex(x => x.Date);
+            entity.HasIndex(x => x.Line);
+            entity.HasIndex(x => x.PartNo);
+            entity.HasIndex(x => x.RQty);
             entity.HasIndex(x => x.UploadedAt);
         });
 

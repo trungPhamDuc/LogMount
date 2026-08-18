@@ -1,0 +1,46 @@
+@page "/RequestLog"
+@model RequestLogModel
+@{
+    ViewData["Title"] = "RequestLog";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <h1 class="h2 mb-1">RequestLog</h1>
+        <p class="text-muted mb-0">Tổng hợp linh kiện bị rơi theo P/N; tỷ lệ rơi = Slg YC / Slg SX.</p>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage)) { <div class="alert alert-success">@Model.StatusMessage</div> }
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage)) { <div class="alert alert-danger">@Model.ErrorMessage</div> }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Tải file RequestLog</h2>
+            <p class="text-muted small">Hỗ trợ 18 cột như mẫu: DATE, SHIFT, LINE … P/N, P.Qty, R.Q'ty, Amt on request, Remarks.</p>
+            <form method="post" asp-page-handler="Upload" enctype="multipart/form-data" class="row g-3 align-items-end">
+                <div class="col-md-8"><label asp-for="UploadFiles" class="form-label">Chọn file (.csv, .xlsx, .xls)</label><input asp-for="UploadFiles" type="file" class="form-control" accept=".csv,.xlsx,.xls" multiple /></div>
+                <div class="col-md-4"><button class="btn btn-primary" type="submit">Tải lên &amp; tổng hợp</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Bộ lọc</h2>
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3"><label asp-for="Date" class="form-label">DATE</label><select asp-for="Date" class="form-select"><option value="">Tất cả</option>@foreach (var date in Model.Dates) { <option value="@date">@date</option> }</select></div>
+                <div class="col-md-3"><label asp-for="Line" class="form-label">LINE</label><select asp-for="Line" class="form-select"><option value="">Tất cả</option>@foreach (var line in Model.Lines) { <option value="@line">@line</option> }</select></div>
+                <div class="col-md-3"><label asp-for="PartNo" class="form-label">P/N</label><input asp-for="PartNo" class="form-control" placeholder="Mã hàng" /></div>
+                <div class="col-md-2"><label asp-for="SortBy" class="form-label">Ưu tiên</label><select asp-for="SortBy" class="form-select"><option value="rqty">R.Q'ty cao nhất</option><option value="rate">Tỷ lệ rơi cao nhất</option></select></div>
+                <div class="col-md-1"><button class="btn btn-outline-primary w-100" type="submit">Lọc</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 card-title mb-0">Dữ liệu RequestLog</h2><span class="text-muted small">@Model.TotalRows.ToString("N0") dòng nguồn</span></div>
+            @if (Model.Summary.Count == 0) { <div class="alert alert-info mb-0">Chọn “Xem dữ liệu theo ngày” hoặc “Xem dữ liệu theo tháng” để xem dữ liệu.</div> }
+            else { <div class="table-responsive"><table class="table table-sm table-striped table-hover align-middle mb-0"><thead class="table-dark"><tr><th>DATE</th><th>P/N</th><th>LINE</th><th class="text-end">P.Qty (Slg SX)</th><th class="text-end">R.Q'ty (Slg YC)</th><th class="text-end">Tỷ lệ rơi</th><th class="text-end">Giá 1 con (VND)</th><th class="text-end">Tổng tiền (VND)</th></tr></thead><tbody>@foreach (var item in Model.Summary) { <tr><td>@item.Date</td><td class="fw-semibold">@item.PartNo</td><td>@item.Line</td><td class="text-end">@item.PQty.ToString("N0")</td><td class="text-end">@item.RQty.ToString("N0")</td><td class="text-end">@item.DropRate.ToString("N2")%</td><td class="text-end">@item.Amount.ToString("N0")</td><td class="text-end fw-semibold">@item.TotalAmount.ToString("N0")</td></tr> }</tbody><tfoot><tr class="table-secondary fw-semibold"><td colspan="3">Tổng cộng</td><td class="text-end">@Model.Summary.Sum(x => x.PQty).ToString("N0")</td><td class="text-end">@Model.Summary.Sum(x => x.RQty).ToString("N0")</td><td></td><td></td><td class="text-end">@Model.Summary.Sum(x => x.TotalAmount).ToString("N0")</td></tr></tfoot></table></div> }
+        </div>
+    </div>
+</div>

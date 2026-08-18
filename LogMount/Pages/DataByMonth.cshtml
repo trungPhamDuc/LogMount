@@ -135,6 +135,10 @@
                             <input asp-for="PartFilter.Line" class="form-control" placeholder="VD: L1" />
                         </div>
                         <div class="col-md-2">
+                            <label asp-for="PartFilter.Lane" class="form-label">Lane</label>
+                            <input asp-for="PartFilter.Lane" class="form-control" placeholder="VD: 1" />
+                        </div>
+                        <div class="col-md-2">
                             <label asp-for="PartFilter.Machine" class="form-label">Máy</label>
                             <input asp-for="PartFilter.Machine" class="form-control" placeholder="VD: G" />
                         </div>
@@ -149,6 +153,14 @@
                         <div class="col-md-3">
                             <label asp-for="PartFilter.ErrorName" class="form-label">Error Name</label>
                             <input asp-for="PartFilter.ErrorName" class="form-control" placeholder="VD: PICK UP ERROR" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="PartFilter.DateFrom" class="form-label">Từ ngày</label>
+                            <input asp-for="PartFilter.DateFrom" type="date" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="PartFilter.DateTo" class="form-label">Đến ngày</label>
+                            <input asp-for="PartFilter.DateTo" type="date" class="form-control" />
                         </div>
                         <div class="col-md-2">
                             <label asp-for="PartFilter.SortDirection" class="form-label">Sắp xếp bảng</label>
@@ -375,6 +387,14 @@
                     <div class="col-md-3">
                         <label asp-for="Filter.PartsName" class="form-label">Parts Name</label>
                         <input asp-for="Filter.PartsName" class="form-control" placeholder="VD: EAN6591401" />
+                    </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.DateFrom" class="form-label">Từ ngày</label>
+                        <input asp-for="Filter.DateFrom" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <label asp-for="Filter.DateTo" class="form-label">Đến ngày</label>
+                        <input asp-for="Filter.DateTo" type="date" class="form-control" />
                     </div>
                     <div class="col-md-2">
                         <label asp-for="Filter.TimeFrom" class="form-label">Từ giờ</label>

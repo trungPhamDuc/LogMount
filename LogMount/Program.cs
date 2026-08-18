@@ -66,6 +66,8 @@ builder.Services.AddSingleton<IRetryLogBatchService, RetryLogBatchService>();
 builder.Services.AddScoped<IErrorLogParserService, ErrorLogParserService>();
 builder.Services.AddScoped<IErrorLogImportService, ErrorLogImportService>();
 builder.Services.AddSingleton<IErrorLogBatchService, ErrorLogBatchService>();
+builder.Services.AddScoped<IRequestLogParserService, RequestLogParserService>();
+builder.Services.AddScoped<IRequestLogImportService, RequestLogImportService>();
 builder.Services.AddScoped<IPartListParserService, PartListParserService>();
 builder.Services.AddSingleton<ILogDataStore, MemoryLogDataStore>();
 builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();

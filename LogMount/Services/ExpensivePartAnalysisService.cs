@@ -81,6 +81,7 @@ public static class ExpensivePartAnalysisService
 
         query = ApplyContainsFilter(query, criteria.PartsName, x => x.PartsName);
         query = ApplyContainsFilter(query, criteria.Line, x => x.Line);
+        query = ApplyContainsFilter(query, criteria.Lane, x => x.Lane);
         query = ApplyContainsFilter(query, criteria.Machine, x => x.Machine);
         query = ApplyContainsFilter(query, criteria.Shift, x => x.Shift);
         query = ApplyContainsFilter(query, criteria.ErrorName, x => x.ErrorName);

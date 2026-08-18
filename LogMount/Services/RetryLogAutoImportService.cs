@@ -30,9 +30,6 @@ public class RetryLogAutoImportService : BackgroundService
             return;
         }
 
-        // Run an immediate import on startup so data is generated right away without waiting
-        await ImportTodayAsync(stoppingToken);
-
         while (!stoppingToken.IsCancellationRequested)
         {
             var now = DateTime.Now;

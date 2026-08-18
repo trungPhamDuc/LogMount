@@ -200,6 +200,8 @@ public class ErrorLogDataByMonthModel : PageModel
             ["Filter.Machine"] = Filter.Machine,
             ["Filter.TimeFrom"] = Filter.TimeFrom,
             ["Filter.TimeTo"] = Filter.TimeTo,
+            ["Filter.DateFrom"] = Filter.DateFrom,
+            ["Filter.DateTo"] = Filter.DateTo,
             ["Filter.SortDirection"] = Filter.SortDirection,
             ["TopN"] = TopN.ToString()
         };
@@ -262,6 +264,18 @@ public class ErrorLogDataByMonthModel : PageModel
         {
             var value = filter.Table.Trim();
             query = query.Where(x => x.Table != null && x.Table.Contains(value));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.DateFrom))
+        {
+            var from = filter.DateFrom.Trim().Replace('-', '/');
+            query = query.Where(x => x.Date != null && string.Compare(x.Date, from) >= 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.DateTo))
+        {
+            var to = filter.DateTo.Trim().Replace('-', '/');
+            query = query.Where(x => x.Date != null && string.Compare(x.Date, to) <= 0);
         }
 
         return query;
