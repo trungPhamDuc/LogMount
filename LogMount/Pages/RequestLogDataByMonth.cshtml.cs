@@ -40,7 +40,7 @@ public class RequestLogDataByMonthModel(LogMountDbContext dbContext) : PageModel
         TotalRows = rows.Count;
         // Không gộp: mỗi dòng CSDL tương ứng một dòng Excel.
         TopN = TopN is 0 or 10 or 20 or 30 ? TopN : 0;
-        var items = rows.Select(x => new RequestLogSummary(x.Date ?? "-", x.ModelSuffix ?? "-", x.Chassis ?? "-", x.Board ?? "-", x.PartAssy ?? "-", x.PartNo ?? "-", x.Line ?? "-", x.PQty, x.RQty, x.AmtOnRequest, Math.Ceiling(x.AmtOnRequest * x.RQty), x.PQty == 0 ? 0 : x.RQty / x.PQty * 100m));
+        var items = rows.Select(x => new RequestLogSummary(x.Date ?? "-", x.ModelSuffix ?? "-", x.Chassis ?? "-", x.Board ?? "-", x.PartAssy ?? "-", x.PartNo ?? "-", x.Line ?? "-", x.PQty, x.RQty, x.RQty == 0 ? 0 : x.AmtOnRequest / x.RQty, x.AmtOnRequest, x.PQty == 0 ? 0 : x.RQty / x.PQty * 100m));
         items = SortBy.ToLowerInvariant() switch
         {
             "rate" => items.OrderByDescending(x => x.DropRate).ThenByDescending(x => x.RQty),

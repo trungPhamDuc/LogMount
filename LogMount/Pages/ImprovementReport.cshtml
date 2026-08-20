@@ -1,0 +1,104 @@
+@page "/ImprovementReport"
+@model ImprovementReportModel
+@{
+    ViewData["Title"] = "Quản lý báo cáo cải thiện";
+}
+
+<div class="logmount-page">
+    <div class="page-header mb-4">
+        <h1 class="h2 mb-1">Quản lý Nhật ký Hành động Cải thiện</h1>
+        <p class="text-muted mb-0">Chọn ngày để xem ai đã cải thiện RetryLog, line nào đã làm và số lượng rơi sau cải thiện có giảm không.</p>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title mb-3">Bộ lọc báo cáo</h2>
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label asp-for="SelectedDate" class="form-label">Ngày</label>
+                    <select asp-for="SelectedDate" class="form-select">
+                        @foreach (var date in Model.AvailableDates)
+                        {
+                            <option value="@date.ToString("yyyy-MM-dd")">@date.ToString("yyyy/MM/dd")</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="WindowDays" class="form-label">Theo dõi sau cải thiện</label>
+                    <select asp-for="WindowDays" class="form-select">
+                        <option value="3">Trong vòng 3 ngày</option>
+                        <option value="5">Trong vòng 5 ngày</option>
+                        <option value="7">Trong vòng 7 ngày</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="EngineerName" class="form-label">Tên người cải thiện</label>
+                    <input asp-for="EngineerName" class="form-control" placeholder="VD: Nguyễn Văn A" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Xem</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.AvailableDates.Count == 0)
+    {
+        <div class="alert alert-warning">Chưa có Nhật ký Hành động Cải thiện.</div>
+    }
+    else if (Model.PersonRows.Count == 0)
+    {
+        <div class="alert alert-warning">Không có hành động cải thiện phù hợp với ngày đã chọn.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="h5 card-title mb-3">Báo cáo ngày @Model.SelectedDate?.ToString("yyyy/MM/dd")</h2>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Tên</th>
+                                <th>Các line đã cải thiện</th>
+                                <th class="text-end">Số hành động</th>
+                                <th>Ngày đã so sánh</th>
+                                <th>Kết quả</th>
+                                <th>Line hiệu quả</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.PersonRows)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.EngineerName</td>
+                                    <td>@item.Lines</td>
+                                    <td class="text-end">@item.ActionCount.ToString("N0")</td>
+                                    <td>@item.ComparedDaysText</td>
+                                    <td>
+                                        <a href="@item.DetailUrl" class="link-primary text-decoration-none">
+                                            @item.ResultText
+                                        </a>
+                                    </td>
+                                    <td>@item.EffectiveLines</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 card-title mb-3">Tổng kết</h2>
+                <ul class="mb-0">
+                    @foreach (var bullet in Model.SummaryBullets)
+                    {
+                        <li>@bullet</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+</div>

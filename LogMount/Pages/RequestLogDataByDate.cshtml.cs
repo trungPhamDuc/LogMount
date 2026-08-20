@@ -40,6 +40,7 @@ public class RequestLogDataByDateModel(LogMountDbContext dbContext) : PageModel
         Entries = chart.ToList();
         ChartDataJson = JsonSerializer.Serialize(chart.Select(x => new { label = $"{x.PartNo} ({x.Line})", requestQty = x.RQty, dropRate = DropRate(x) }), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
     }
-    public static decimal TotalAmount(RequestLogEntry item) => Math.Ceiling(item.AmtOnRequest * item.RQty);
+    public static decimal UnitAmount(RequestLogEntry item) => item.RQty == 0 ? 0 : item.AmtOnRequest / item.RQty;
+    public static decimal TotalAmount(RequestLogEntry item) => item.AmtOnRequest;
     private static decimal DropRate(RequestLogEntry item) => item.PQty == 0 ? 0 : item.RQty / item.PQty * 100m;
 }

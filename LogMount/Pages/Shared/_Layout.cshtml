@@ -27,6 +27,7 @@
         var isRequestLogPage = currentPage.Equals("/RequestLog", StringComparison.OrdinalIgnoreCase) ||
                                currentPage.Equals("/RequestLogDataByDate", StringComparison.OrdinalIgnoreCase) ||
                                currentPage.Equals("/RequestLogDataByMonth", StringComparison.OrdinalIgnoreCase);
+        var isImprovementReportPage = currentPage.Equals("/ImprovementReport", StringComparison.OrdinalIgnoreCase);
         var canEdit = User.IsInRole("Staff") || User.IsInRole("Admin");
         var profileInitial = string.IsNullOrWhiteSpace(User.Identity?.Name) ? "?" : User.Identity!.Name![..1].ToUpperInvariant();
     }
@@ -108,6 +109,13 @@
                 {
                     <a class="sidebar-link sidebar-sublink" asp-page="/Users"><span class="sidebar-link-title">Quản lý người dùng</span></a>
                 }
+                @if (canEdit)
+                {
+                    <a class="sidebar-link sidebar-sublink @(isImprovementReportPage ? "active" : "")" asp-page="/ImprovementReport">
+                        <span class="sidebar-link-title">Quản lý báo cáo</span>
+                        <span class="sidebar-link-subtitle">Nhật ký cải thiện</span>
+                    </a>
+                }
             </nav>
         </aside>
 
@@ -118,6 +126,8 @@
                     <div class="px-3 py-2 border-bottom"><div class="fw-semibold">@User.Identity?.Name</div><div class="small text-muted">@string.Join(", ", User.Claims.Where(c => c.Type.EndsWith("role")).Select(c => c.Value))</div></div>
                     @if (User.IsInRole("Admin"))
                     { <a class="dropdown-item" asp-page="/Users">Quản lý người dùng</a> }
+                    @if (canEdit)
+                    { <a class="dropdown-item" asp-page="/ImprovementReport">Quản lý báo cáo</a> }
                     <form method="post" asp-page="/Login" asp-page-handler="Logout" class="logout-form"><button class="dropdown-item text-danger" type="submit">Đăng xuất</button></form>
                 </div>
             </div>

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using LogMount.Data;
 using LogMount.Models;
+using LogMount.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Caching.Memory;
@@ -71,6 +72,7 @@ public class RetryLogImprovementModel : PageModel
         AvailablePartsNames = await GetFilterOptionsAsync(e => e.PartsName, "parts", cancellationToken);
         AvailableErrorNames = await GetFilterOptionsAsync(e => e.ErrorName, "error-names", cancellationToken);
         AvailableErrorNos = await GetFilterOptionsAsync(e => e.ErrorNo, "error-nos", cancellationToken);
+        AvailableMachines = await GetMachineOptionsAsync(cancellationToken);
 
         // Build EF Query for RetryLogEntries
         var query = _dbContext.RetryLogEntries.AsNoTracking();
@@ -89,18 +91,8 @@ public class RetryLogImprovementModel : PageModel
             query = query.Where(e => e.Date != null && e.Date.CompareTo(to) <= 0);
         }
 
-        if (!string.IsNullOrWhiteSpace(Filter.Line))
-        {
-            var l = Filter.Line.Trim();
-            query = query.Where(e => (e.Line != null && e.Line.Contains(l)) ||
-                                     (e.LotName != null && e.LotName.Contains(l)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(Filter.Lane))
-        {
-            var lane = Filter.Lane.Trim();
-            query = query.Where(e => e.Lane != null && e.Lane.Contains(lane));
-        }
+        // Line/Lane can be stored in different formats or only derivable after
+        // projection. Apply them below after reading the light row set.
 
         if (!string.IsNullOrWhiteSpace(Filter.Table))
         {
@@ -191,8 +183,11 @@ public class RetryLogImprovementModel : PageModel
             .Select(e => new
             {
                 e.Date,
+                e.Line,
+                e.Lane,
                 e.LotName,
-                e.PartsName
+                e.PartsName,
+                e.ErrorName
             })
             .ToListAsync(cancellationToken);
 
@@ -212,19 +207,43 @@ public class RetryLogImprovementModel : PageModel
             var side = Filter.Side.Trim().ToUpperInvariant();
             projectedList = projectedList.Where(e =>
             {
-                var s = ParseSideFromLot(e.LotName).ToUpperInvariant();
+                var (_, parsedSide, _) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
+                var s = parsedSide.ToUpperInvariant();
                 if (side == "BOT" || side == "B") return s == "B" || s.Contains("BOT");
                 if (side == "TOP" || side == "T") return s == "T" || s.Contains("TOP");
                 return s.Contains(side);
             }).ToList();
         }
 
+        if (!string.IsNullOrWhiteSpace(Filter.Line))
+        {
+            var line = NormalizeLineFilter(Filter.Line);
+            projectedList = projectedList.Where(e =>
+            {
+                var (parsedLine, _, _) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
+                return parsedLine.Equals(line, StringComparison.OrdinalIgnoreCase) ||
+                       parsedLine.Contains(line, StringComparison.OrdinalIgnoreCase) ||
+                       (e.Line?.Contains(Filter.Line.Trim(), StringComparison.OrdinalIgnoreCase) == true);
+            }).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Lane))
+        {
+            var lane = Filter.Lane.Trim();
+            projectedList = projectedList.Where(e =>
+                e.Lane?.Contains(lane, StringComparison.OrdinalIgnoreCase) == true ||
+                e.LotName?.Contains($"LANE{lane}", StringComparison.OrdinalIgnoreCase) == true).ToList();
+        }
+
         if (!string.IsNullOrWhiteSpace(Filter.Machine))
         {
             var machine = Filter.Machine.Trim();
             projectedList = projectedList.Where(e =>
-                ParseMachineFromLot(e.LotName).Equals(machine, StringComparison.OrdinalIgnoreCase) ||
-                ParseMachineFromLot(e.LotName).Contains(machine, StringComparison.OrdinalIgnoreCase)).ToList();
+            {
+                var (_, _, parsedMachine) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
+                return parsedMachine.Equals(machine, StringComparison.OrdinalIgnoreCase) ||
+                       parsedMachine.Contains(machine, StringComparison.OrdinalIgnoreCase);
+            }).ToList();
         }
 
         FilteredRetries = projectedList.Count;
@@ -405,17 +424,39 @@ public class RetryLogImprovementModel : PageModel
         return DateTime.MinValue;
     }
 
-    private static string ParseSideFromLot(string? lotName)
+    private async Task<IReadOnlyList<string>> GetMachineOptionsAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(lotName)) return "";
-        var parts = lotName.Split('_', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length > 2 ? parts[2] : "";
+        var cacheKey = "retry-improvement-filter-options:machines";
+        var values = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+
+            var rows = await _dbContext.RetryLogEntries.AsNoTracking()
+                .Select(x => new { x.Line, x.LotName })
+                .Where(x => x.Line != null || x.LotName != null)
+                .Take(5000)
+                .ToListAsync(cancellationToken);
+
+            return rows
+                .Select(x => LotNameParser.ParseLineComponents(x.Line, x.LotName).Machine)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .Take(50)
+                .ToList();
+        });
+
+        return values ?? [];
     }
 
-    private static string ParseMachineFromLot(string? lotName)
+    private static string NormalizeLineFilter(string value)
     {
-        if (string.IsNullOrWhiteSpace(lotName)) return "";
-        var parts = lotName.Split('_', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length > 3 ? parts[3] : "";
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("L", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        return int.TryParse(trimmed, out _) ? $"L{trimmed}" : trimmed;
     }
 }
