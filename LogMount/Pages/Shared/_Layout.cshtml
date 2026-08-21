@@ -112,8 +112,8 @@
                 @if (canEdit)
                 {
                     <a class="sidebar-link sidebar-sublink @(isImprovementReportPage ? "active" : "")" asp-page="/ImprovementReport">
-                        <span class="sidebar-link-title">Quản lý báo cáo</span>
-                        <span class="sidebar-link-subtitle">Nhật ký cải thiện</span>
+                        <span class="sidebar-link-title">Báo cáo PowerPoint</span>
+                        <span class="sidebar-link-subtitle">Xem theo ngày &amp; tải file</span>
                     </a>
                 }
             </nav>
@@ -127,7 +127,7 @@
                     @if (User.IsInRole("Admin"))
                     { <a class="dropdown-item" asp-page="/Users">Quản lý người dùng</a> }
                     @if (canEdit)
-                    { <a class="dropdown-item" asp-page="/ImprovementReport">Quản lý báo cáo</a> }
+                    { <a class="dropdown-item" asp-page="/ImprovementReport">Báo cáo PowerPoint</a> }
                     <form method="post" asp-page="/Login" asp-page-handler="Logout" class="logout-form"><button class="dropdown-item text-danger" type="submit">Đăng xuất</button></form>
                 </div>
             </div>

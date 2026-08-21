@@ -388,6 +388,128 @@ body {
   overflow: auto;
 }
 
+.improvement-powerpoint-report {
+  background: #fff;
+}
+
+.improvement-powerpoint-report .report-paper {
+  max-width: 1080px;
+  min-height: 760px;
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+  border: 1px solid #cfd4da;
+}
+
+.improvement-powerpoint-report .report-title {
+  margin: 0;
+  color: #050505;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.improvement-powerpoint-report .report-filter {
+  padding-top: 0.15rem;
+}
+
+.improvement-powerpoint-report .report-chart-box {
+  position: relative;
+  width: 100%;
+  height: 180px;
+}
+
+.improvement-powerpoint-report .report-notes {
+  display: grid;
+  gap: 2.25rem;
+  padding: 2.1rem 0 0 1.5rem;
+  color: #050505;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.improvement-powerpoint-report .report-total {
+  color: #444;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.improvement-powerpoint-report .report-table-section {
+  max-width: 700px;
+  margin-top: 1.5rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #e2e6ea;
+}
+
+.improvement-powerpoint-report .report-table-section h2 {
+  margin: 0;
+  color: #444;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.improvement-powerpoint-report .export-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 0.45rem;
+  color: #10824a;
+  border: 1px solid #38a169;
+  border-radius: 2px;
+  font-size: 0.63rem;
+  line-height: 1;
+}
+
+.improvement-powerpoint-report .report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.61rem;
+}
+
+.improvement-powerpoint-report .report-table thead th {
+  padding: 0.18rem 0.28rem;
+  color: #fff;
+  background: #20252a;
+  border: 0;
+  white-space: nowrap;
+}
+
+.improvement-powerpoint-report .report-table tbody td {
+  padding: 0.18rem 0.28rem;
+  border: 0;
+  white-space: nowrap;
+}
+
+.improvement-powerpoint-report .report-table tbody tr:nth-child(odd) td {
+  background: #f2f2f2;
+}
+
+.improvement-powerpoint-report .report-table tbody tr:nth-child(even) td {
+  background: #e7e7e7;
+}
+
+.improvement-powerpoint-report .report-table tfoot td {
+  padding: 0.2rem 0.28rem;
+  background: #d8d8d8;
+  border-top: 1px solid #a8a8a8;
+  font-weight: 700;
+}
+
+.improvement-powerpoint-report .status-pill {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 54px;
+  height: 18px;
+  color: #fff;
+  background: #8f969d;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.improvement-powerpoint-report .status-pill.done {
+  background: #198754;
+}
+
 @media (max-width: 991.98px) {
   .app-shell {
     display: block;

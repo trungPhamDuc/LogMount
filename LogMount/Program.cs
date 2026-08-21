@@ -72,6 +72,7 @@ builder.Services.AddScoped<IPartListParserService, PartListParserService>();
 builder.Services.AddSingleton<ILogDataStore, MemoryLogDataStore>();
 builder.Services.AddSingleton<IPartDataStore, MemoryPartDataStore>();
 builder.Services.AddSingleton<ILogExportService, LogExportService>();
+builder.Services.AddSingleton<IPowerPointReportService, PowerPointReportService>();
 builder.Services.AddHostedService<RetryLogAutoImportService>();
 builder.Services.AddHostedService<ErrorLogAutoImportService>();
 builder.Services.AddHostedService<BatchInfrastructureInitializer>();
