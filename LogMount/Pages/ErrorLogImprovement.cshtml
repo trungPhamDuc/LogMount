@@ -386,39 +386,9 @@
 @section Scripts {
     @if (Model.IsFilterApplied && Model.FilteredErrors > 0)
     {
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script src="~/js/chart-enhancements.js" asp-append-version="true"></script>
         <script>
             (function () {
-                var customDatalabelsPlugin = {
-                    id: 'customDatalabelsPlugin',
-                    afterDatasetsDraw: function (chart) {
-                        var ctx = chart.ctx;
-                        chart.data.datasets.forEach(function (dataset, datasetIndex) {
-                            var meta = chart.getDatasetMeta(datasetIndex);
-                            if (meta.hidden) return;
-
-                            meta.data.forEach(function (element, index) {
-                                var val = dataset.data[index];
-                                if (val === null || val === undefined) return;
-
-                                ctx.save();
-                                ctx.font = 'bold 11px sans-serif';
-                                ctx.textAlign = 'center';
-
-                                if (dataset.yAxisID === 'y1') {
-                                    ctx.fillStyle = '#dc2626';
-                                    ctx.textBaseline = 'bottom';
-                                    ctx.fillText(val.toFixed(1) + '%', element.x, element.y - 8);
-                                } else {
-                                    ctx.fillStyle = '#1e3a8a';
-                                    ctx.textBaseline = 'bottom';
-                                    ctx.fillText(Number(val).toLocaleString(), element.x, element.y - 4);
-                                }
-                                ctx.restore();
-                            });
-                        });
-                    }
-                };
 
                 // 1. Render Daily Chart (Tab 1)
                 var dailyCanvas = document.getElementById('errorDailyChart');
@@ -463,14 +433,13 @@
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 layout: { padding: { top: 25, right: 10, bottom: 10, left: 10 } },
-                                plugins: { legend: { display: false } },
+                                plugins: { legend: { display: true, position: 'top', labels: { usePointStyle: true, padding: 14 } } },
                                 scales: {
                                     x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 11 } } },
                                     y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Số lần' }, beginAtZero: true },
                                     y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: '%' }, beginAtZero: true, min: 0, max: Math.max(100, Math.ceil(Math.max.apply(null, dPcts) * 1.25)), grid: { drawOnChartArea: false } }
                                 }
                             },
-                            plugins: [customDatalabelsPlugin]
                         });
                     }
                 }
@@ -518,14 +487,13 @@
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 layout: { padding: { top: 25, right: 10, bottom: 10, left: 10 } },
-                                plugins: { legend: { display: false } },
+                                plugins: { legend: { display: true, position: 'top', labels: { usePointStyle: true, padding: 14 } } },
                                 scales: {
                                     x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 10 } } },
                                     y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Số lần' }, beginAtZero: true },
                                     y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: '%' }, beginAtZero: true, min: 0, max: Math.max(100, Math.ceil(Math.max.apply(null, ePcts) * 1.25)), grid: { drawOnChartArea: false } }
                                 }
                             },
-                            plugins: [customDatalabelsPlugin]
                         });
                     }
                 }

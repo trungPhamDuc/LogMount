@@ -20,11 +20,13 @@ public class RetryLogImprovementModel : PageModel
 
     private readonly LogMountDbContext _dbContext;
     private readonly IMemoryCache _cache;
+    private readonly IPowerPointReportService _pptReportService;
 
-    public RetryLogImprovementModel(LogMountDbContext dbContext, IMemoryCache cache)
+    public RetryLogImprovementModel(LogMountDbContext dbContext, IMemoryCache cache, IPowerPointReportService pptReportService)
     {
         _dbContext = dbContext;
         _cache = cache;
+        _pptReportService = pptReportService;
     }
 
     [BindProperty(SupportsGet = true)]
@@ -458,5 +460,334 @@ public class RetryLogImprovementModel : PageModel
         }
 
         return int.TryParse(trimmed, out _) ? $"L{trimmed}" : trimmed;
+    }
+
+    public async Task<IActionResult> OnPostDownloadPptxAsync(
+        [FromForm] string chartTitle,
+        [FromForm] string baseFileName,
+        CancellationToken cancellationToken)
+    {
+        // 1. Query error log/retry log entries to calculate daily trend
+        var query = _dbContext.RetryLogEntries.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(Filter.FromDate))
+        {
+            var from = NormalizeFilterDate(Filter.FromDate);
+            query = query.Where(e => e.Date != null && e.Date.CompareTo(from) >= 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.ToDate))
+        {
+            var to = NormalizeFilterDate(Filter.ToDate);
+            query = query.Where(e => e.Date != null && e.Date.CompareTo(to) <= 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Table))
+        {
+            var tbl = Filter.Table.Trim();
+            query = query.Where(e => e.Table != null && e.Table.Contains(tbl));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.PartsName))
+        {
+            var p = Filter.PartsName.Trim();
+            query = query.Where(e => e.PartsName != null && e.PartsName.Contains(p));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.ErrorName))
+        {
+            var errName = Filter.ErrorName.Trim();
+            query = query.Where(e => e.ErrorName != null && e.ErrorName.Contains(errName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.ErrorNo))
+        {
+            var errNo = Filter.ErrorNo.Trim();
+            query = query.Where(e => e.ErrorNo != null && e.ErrorNo.Contains(errNo));
+        }
+
+        var projectedList = await query
+            .Select(e => new
+            {
+                e.Date,
+                e.Line,
+                e.Lane,
+                e.LotName,
+                e.PartsName,
+                e.ErrorName
+            })
+            .ToListAsync(cancellationToken);
+
+        // Apply filters derived from LotNameParser
+        if (!string.IsNullOrWhiteSpace(Filter.Side))
+        {
+            var side = Filter.Side.Trim().ToUpperInvariant();
+            projectedList = projectedList.Where(e =>
+            {
+                var (_, parsedSide, _) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
+                var s = parsedSide.ToUpperInvariant();
+                if (side == "BOT" || side == "B") return s == "B" || s.Contains("BOT");
+                if (side == "TOP" || side == "T") return s == "T" || s.Contains("TOP");
+                return s.Contains(side);
+            }).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Line))
+        {
+            var line = NormalizeLineFilter(Filter.Line);
+            projectedList = projectedList.Where(e =>
+            {
+                var (parsedLine, _, _) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
+                return parsedLine.Equals(line, StringComparison.OrdinalIgnoreCase) ||
+                       parsedLine.Contains(line, StringComparison.OrdinalIgnoreCase) ||
+                       (e.Line?.Contains(Filter.Line.Trim(), StringComparison.OrdinalIgnoreCase) == true);
+            }).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Lane))
+        {
+            var lane = Filter.Lane.Trim();
+            projectedList = projectedList.Where(e =>
+                e.Lane?.Contains(lane, StringComparison.OrdinalIgnoreCase) == true ||
+                e.LotName?.Contains($"LANE{lane}", StringComparison.OrdinalIgnoreCase) == true).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Machine))
+        {
+            var machine = Filter.Machine.Trim();
+            projectedList = projectedList.Where(e =>
+            {
+                var (_, _, parsedMachine) = LotNameParser.ParseLineComponents(e.Line, e.LotName);
+                return parsedMachine.Equals(machine, StringComparison.OrdinalIgnoreCase) ||
+                       parsedMachine.Contains(machine, StringComparison.OrdinalIgnoreCase);
+            }).ToList();
+        }
+
+        // Calculate Daily Counts & DailyItems
+        var dailyGroups = projectedList
+            .GroupBy(e => NormalizeDateString(e.Date))
+            .Select(g => new
+            {
+                Date = g.Key,
+                SortDate = ParseDateForSorting(g.Key),
+                Count = g.Count()
+            })
+            .OrderBy(x => x.SortDate)
+            .ToList();
+
+        double dailyCumulative = 0;
+        var dailyItemList = new List<DailyImprovementItem>();
+
+        for (int i = 0; i < dailyGroups.Count; i++)
+        {
+            var dg = dailyGroups[i];
+            double pct = projectedList.Count > 0 ? (dg.Count * 100.0 / projectedList.Count) : 0;
+            dailyCumulative += pct;
+
+            string trend = "-";
+            if (i > 0)
+            {
+                int prevCount = dailyGroups[i - 1].Count;
+                if (dg.Count > prevCount) trend = "▲ Tăng";
+                else if (dg.Count < prevCount) trend = "▼ Giảm";
+                else trend = "► Bằng";
+            }
+
+            var topPartsForDay = projectedList
+                .Where(e => NormalizeDateString(e.Date) == dg.Date && !string.IsNullOrWhiteSpace(e.PartsName))
+                .GroupBy(e => e.PartsName)
+                .Select(g => $"{g.Key} ({g.Count()})")
+                .Take(3);
+            var topPartsStr = string.Join(", ", topPartsForDay);
+
+            dailyItemList.Add(new DailyImprovementItem
+            {
+                Rank = i + 1,
+                Date = dg.Date,
+                Count = dg.Count,
+                Percentage = Math.Round(pct, 1),
+                CumulativePercentage = Math.Round(dailyCumulative, 1),
+                TopPartsOrErrors = topPartsStr,
+                TrendIndicator = trend
+            });
+        }
+
+        // 2. Query improvement history items
+        var impQuery = _dbContext.RetryImproves.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(Filter.FromDate))
+        {
+            if (DateTime.TryParse(Filter.FromDate, out var fromDt))
+            {
+                impQuery = impQuery.Where(x => x.ExecutionDate >= fromDt.Date);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.ToDate))
+        {
+            if (DateTime.TryParse(Filter.ToDate, out var toDt))
+            {
+                impQuery = impQuery.Where(x => x.ExecutionDate <= toDt.Date);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.PartsName))
+        {
+            var p = Filter.PartsName.Trim();
+            impQuery = impQuery.Where(x => x.PartsName != null && x.PartsName.Contains(p));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Line))
+        {
+            var l = Filter.Line.Trim();
+            impQuery = impQuery.Where(x => x.Line != null && x.Line.Contains(l));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Lane))
+        {
+            var lane = Filter.Lane.Trim();
+            impQuery = impQuery.Where(x => x.Lane != null && x.Lane.Contains(lane));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Side))
+        {
+            var side = Filter.Side.Trim().ToUpperInvariant();
+            if (side == "BOT" || side == "B")
+            {
+                impQuery = impQuery.Where(x => x.Side != null && (x.Side == "B" || x.Side.Contains("BOT") || x.Side.Contains("Bot") || x.Side.Contains("bot")));
+            }
+            else if (side == "TOP" || side == "T")
+            {
+                impQuery = impQuery.Where(x => x.Side != null && (x.Side == "T" || x.Side.Contains("TOP") || x.Side.Contains("Top") || x.Side.Contains("top")));
+            }
+            else
+            {
+                impQuery = impQuery.Where(x => x.Side != null && x.Side.Contains(side));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(Filter.Machine))
+        {
+            var m = Filter.Machine.Trim();
+            impQuery = impQuery.Where(x => x.Machine != null && x.Machine.Contains(m));
+        }
+
+        var historyItems = await impQuery
+            .OrderByDescending(x => x.ExecutionDate)
+            .ThenByDescending(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        // 3. Build comments/remarks
+        var commentsList = new List<string>();
+
+        if (dailyGroups.Count >= 2)
+        {
+            var firstDay = dailyGroups.First();
+            var lastDay = dailyGroups.Last();
+            var diff = lastDay.Count - firstDay.Count;
+            if (diff < 0)
+            {
+                var pct = firstDay.Count > 0 ? Math.Abs(diff) * 100.0 / firstDay.Count : 0;
+                commentsList.Add($"- Xu huong retries: So lan retries GIAM tu {firstDay.Count:N0} lan ({firstDay.Date}) xuong {lastDay.Count:N0} lan ({lastDay.Date}) (giam {pct:N1}%).");
+                commentsList.Add("- Danh gia hieu qua: Cac hanh dong cai thien buoc dau giup tiet giam loi ro ret.");
+            }
+            else if (diff > 0)
+            {
+                var pct = firstDay.Count > 0 ? diff * 100.0 / firstDay.Count : 0;
+                commentsList.Add($"- Xu huong retries: So lan retries TANG tu {firstDay.Count:N0} len {lastDay.Count:N0} lan (tang {pct:N1}%).");
+                commentsList.Add("- Khuyen nghi: Xu huong retries dang tang, can ky su tiep tuc kiem tra ky thiet bi, nhat la buoc gap/tha.");
+            }
+            else
+            {
+                commentsList.Add($"- Xu huong retries: Duy tri on dinh o muc {lastDay.Count:N0} lan.");
+            }
+        }
+        else if (dailyGroups.Count == 1)
+        {
+            commentsList.Add($"- Thong ke: Ghi nhan {dailyGroups[0].Count:N0} lan retries trong ngay {dailyGroups[0].Date}.");
+        }
+        else
+        {
+            commentsList.Add("- Thong ke: Chua ghi nhan du lieu retries trong khoảng thoi gian nay.");
+        }
+
+        if (historyItems.Count > 0)
+        {
+            var topEngineers = historyItems
+                .Where(x => !string.IsNullOrEmpty(x.EngineerName))
+                .GroupBy(x => x.EngineerName)
+                .OrderByDescending(g => g.Count())
+                .Select(g => $"{g.Key} ({g.Count()} lan)")
+                .Take(2)
+                .ToList();
+            if (topEngineers.Count > 0)
+            {
+                commentsList.Add($"- Ky su thuc hien chinh: {string.Join(", ", topEngineers)} da tich cai thien.");
+            }
+
+            var topParts = historyItems
+                .Where(x => !string.IsNullOrEmpty(x.PartsName))
+                .GroupBy(x => x.PartsName)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .Take(2)
+                .ToList();
+            if (topParts.Count > 0)
+            {
+                commentsList.Add($"- Doi tuong tap trung: Tap trung cai tien loi cho linh kien {string.Join(", ", topParts)}.");
+            }
+        }
+        else
+        {
+            commentsList.Add("- Hanh dong cai thien: Chua ghi nhan nhat ky hanh dong nao trong khoang ngay nay.");
+        }
+
+        // Build table data
+        var headers = new[] { "Ngay", "Parts Name", "Line", "Lane", "Mat", "May", "Ten Loi", "Ky su", "Hanh dong" };
+        var widths = new[] { 700000, 900000, 350000, 300000, 300000, 300000, 800000, 750000, 1400000 };
+
+        var rows = new List<string[]>();
+        foreach (var item in historyItems)
+        {
+            var partName = item.PartsName ?? string.Empty;
+            if (partName.Length > 18) partName = partName[..15] + "...";
+
+            var errorName = item.ErrorName ?? string.Empty;
+            if (errorName.Length > 14) errorName = errorName[..12] + "...";
+
+            var engineer = item.EngineerName ?? string.Empty;
+            if (engineer.Length > 12) engineer = engineer[..10] + "...";
+
+            var action = item.ActionTaken ?? string.Empty;
+            if (action.Length > 60) action = action[..57] + "...";
+
+            rows.Add(new[]
+            {
+                item.ExecutionDate.ToString("dd/MM/yyyy"),
+                partName,
+                item.Line ?? "",
+                item.Lane ?? "",
+                item.Side ?? "",
+                item.Machine ?? "",
+                errorName,
+                engineer,
+                action
+            });
+        }
+
+        var dateRangeDesc = $"Khoang ngay: {(Filter.FromDate ?? "...")} den {(Filter.ToDate ?? "...")}";
+        var subtitle = $"{dateRangeDesc} | So ban ghi: {historyItems.Count}";
+
+        var result = _pptReportService.ExportSingleSlideWithChartAndTable(
+            chartTitle ?? "Bieu do theo doi retries qua cac ngay",
+            subtitle,
+            dailyItemList,
+            headers,
+            widths,
+            rows,
+            commentsList.ToArray(),
+            baseFileName ?? "BaoCaoCaiThien");
+
+        return File(result.Content, result.ContentType, result.FileName);
     }
 }

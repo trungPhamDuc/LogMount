@@ -12,6 +12,7 @@ public interface IPowerPointReportService
         IReadOnlyList<ExpensivePartTopItem> topParts,
         IReadOnlyList<ExpensivePartSummaryItem> summaryItems,
         IReadOnlySet<string> improvedLines,
+        IReadOnlySet<string> improvedRowKeys,
         bool sortByCost,
         string baseFileName);
 
@@ -20,6 +21,16 @@ public interface IPowerPointReportService
         int windowDays,
         IReadOnlyList<PowerPointImprovementReportRow> rows,
         IReadOnlyList<string> summaryBullets);
+
+    FileExportResult ExportSingleSlideWithChartAndTable(
+        string title,
+        string subtitle,
+        IReadOnlyList<DailyImprovementItem> dailyItems,
+        string[] tableHeaders,
+        int[] columnWidths,
+        List<string[]> tableRows,
+        string[] comments,
+        string baseFileName);
 }
 
 public class PowerPointReportService : IPowerPointReportService
@@ -31,6 +42,7 @@ public class PowerPointReportService : IPowerPointReportService
         IReadOnlyList<ExpensivePartTopItem> topParts,
         IReadOnlyList<ExpensivePartSummaryItem> summaryItems,
         IReadOnlySet<string> improvedLines,
+        IReadOnlySet<string> improvedRowKeys,
         bool sortByCost,
         string baseFileName)
     {
@@ -46,6 +58,19 @@ public class PowerPointReportService : IPowerPointReportService
                 g.Sum(x => x.Count),
                 g.Sum(x => x.TotalCost),
                 improvedLines.Contains(g.Key)))
+            .Where(x => x.Count >= 6)
+            .ToList();
+
+        var lineItemsSet = lineItems.Select(x => x.Line).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in improvedLines)
+        {
+            if (!lineItemsSet.Contains(line))
+            {
+                lineItems.Add(new LineReportItem(line, 0, 0m, true));
+            }
+        }
+
+        lineItems = lineItems
             .OrderByDescending(x => x.Count)
             .ThenBy(x => x.Line, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -53,7 +78,7 @@ public class PowerPointReportService : IPowerPointReportService
         var slides = new[]
         {
             BuildOverviewSlide(topParts.Take(10).ToList(), lineItems, sortByCost),
-            BuildStatusTableSlide(summaryItems.Take(14).ToList(), improvedLines)
+            BuildStatusTableSlide(summaryItems.Take(14).ToList(), improvedRowKeys)
         };
 
         using var memoryStream = new MemoryStream();
@@ -127,6 +152,251 @@ public class PowerPointReportService : IPowerPointReportService
         };
     }
 
+    public FileExportResult ExportSingleSlideWithChartAndTable(
+        string title,
+        string subtitle,
+        IReadOnlyList<DailyImprovementItem> dailyItems,
+        string[] tableHeaders,
+        int[] columnWidths,
+        List<string[]> tableRows,
+        string[] comments,
+        string baseFileName)
+    {
+        var safeBaseName = SanitizeFileName(Path.GetFileNameWithoutExtension(baseFileName));
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        var fileName = $"{safeBaseName}_{timestamp}.pptx";
+
+        var slide = new SlideXmlBuilder();
+        
+        // Title & Subtitle
+        slide.Text(title, 250000, 160000, 11692000, 360000, 20, "000000", bold: true);
+        slide.Text(subtitle, 250000, 560000, 11692000, 260000, 11, "555555");
+
+        // --- LEFT SIDE (X = 250,000, W = 5,600,000) ---
+        // 1. Top Left: Vector Column Chart (Y = 1,000,000, H = 2,700,000)
+        AddDailyColumnChart(slide, dailyItems, 250000, 1000000, 5600000, 2700000);
+
+        // 2. Bottom Left: Daily Summary Table (Y = 3,850,000)
+        AddDailySummaryTable(slide, dailyItems, 250000, 3850000, 5600000);
+
+        // --- RIGHT SIDE (X = 6,100,000, W = 5,800,000) ---
+        // 1. Top Right: Action Logs Table (Y = 1,000,000)
+        var xTable = 6100000;
+        var yTable = 1000000;
+        const int rowHeight = 310000;
+
+        slide.Text("NHAT KY HANH DONG CAI TIEN RETRIES", xTable, yTable, 5800000, 240000, 10, "1E3A8A", bold: true);
+        yTable += 260000;
+
+        // Draw Table Header
+        AddTableRow(slide, tableHeaders, columnWidths, xTable, yTable, rowHeight, "22272E", "FFFFFF", bold: true);
+        yTable += rowHeight;
+
+        // Draw Table Rows (up to 9 rows)
+        foreach (var row in tableRows.Take(9))
+        {
+            AddTableRow(slide, row, columnWidths, xTable, yTable, rowHeight, "F8F9FA", "111111");
+            yTable += rowHeight;
+        }
+
+        // 2. Bottom Right: Comments / Remarks box (Y = 4,700,000, H = 1,900,000)
+        if (comments != null && comments.Length > 0)
+        {
+            slide.Rect(6100000, 4700000, 5800000, 1900000, "F0F4F8", "C8D6E5");
+            slide.Text("NHAN XET & EVALUATION (NHAT KY CAI TIEN)", 6220000, 4780000, 5560000, 260000, 10, "1B3A4B", bold: true);
+            
+            var commentsText = string.Join("\n", comments.Select(c => StripVietnameseForPpt(c)));
+            slide.Text(commentsText, 6220000, 5100000, 5560000, 1400000, 8, "333333");
+        }
+
+        var slideXml = slide.Build();
+
+        using var memoryStream = new MemoryStream();
+        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddText(archive, "[Content_Types].xml", BuildContentTypes(1));
+            AddText(archive, "_rels/.rels", RootRelationships());
+            AddText(archive, "ppt/presentation.xml", BuildPresentation(1));
+            AddText(archive, "ppt/_rels/presentation.xml.rels", BuildPresentationRelationships(1));
+            AddText(archive, "ppt/slideMasters/slideMaster1.xml", SlideMaster());
+            AddText(archive, "ppt/slideMasters/_rels/slideMaster1.xml.rels", SlideMasterRelationships());
+            AddText(archive, "ppt/slideLayouts/slideLayout1.xml", SlideLayout());
+            AddText(archive, "ppt/slideLayouts/_rels/slideLayout1.xml.rels", SlideLayoutRelationships());
+            AddText(archive, "ppt/theme/theme1.xml", Theme());
+
+            // Write Slide 1 XML and Relationships (standard slide, no external image required)
+            AddText(archive, "ppt/slides/slide1.xml", slideXml);
+            AddText(archive, "ppt/slides/_rels/slide1.xml.rels", SlideRelationships(hasImage: false));
+        }
+
+        return new FileExportResult
+        {
+            Content = memoryStream.ToArray(),
+            ContentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            FileName = fileName
+        };
+    }
+
+    private static void AddDailySummaryTable(SlideXmlBuilder slide, IReadOnlyList<DailyImprovementItem> dailyItems, int x, int y, int width)
+    {
+        // Section Title
+        slide.Text("THONG KE CHI TIET SO LAN RETRIES THEO TUNG NGAY", x, y, width, 240000, 10, "1E3A8A", bold: true);
+        var tableY = y + 260000;
+        const int rowHeight = 240000;
+
+        // Column widths: Total = 5,600,000
+        var widths = new[] { 300000, 850000, 950000, 650000, 750000, 2100000 };
+        var headers = new[] { "#", "Ngay", "So lan retries", "Ty le %", "Xu huong", "Linh kien retries nhieu nhat trong ngay" };
+
+        // Header Row
+        var curX = x;
+        for (int c = 0; c < headers.Length; c++)
+        {
+            slide.Rect(curX, tableY, widths[c], rowHeight, "22272E", "22272E");
+            slide.Text(headers[c], curX + 5000, tableY + 20000, widths[c] - 10000, rowHeight - 40000, 7, "FFFFFF", bold: true, wrap: false, padding: 5000);
+            curX += widths[c];
+        }
+        tableY += rowHeight;
+
+        if (dailyItems == null || dailyItems.Count == 0) return;
+
+        int totalRetries = dailyItems.Sum(item => item.Count);
+
+        // Data Rows (up to 7 days)
+        foreach (var item in dailyItems.Take(7))
+        {
+            curX = x;
+            var bgColor = "F8F9FA";
+            var borderColor = "E2E8F0";
+
+            // Col 0: Rank #
+            slide.Rect(curX, tableY, widths[0], rowHeight, bgColor, borderColor);
+            slide.Text(item.Rank.ToString(), curX + 5000, tableY + 20000, widths[0] - 10000, rowHeight - 40000, 7, "333333", bold: true, wrap: false, padding: 5000);
+            curX += widths[0];
+
+            // Col 1: Date (Blue #1D4ED8)
+            var shortDate = item.Date.Length > 10 ? item.Date[..10] : item.Date;
+            slide.Rect(curX, tableY, widths[1], rowHeight, bgColor, borderColor);
+            slide.Text(shortDate, curX + 5000, tableY + 20000, widths[1] - 10000, rowHeight - 40000, 7, "1D4ED8", bold: true, wrap: false, padding: 5000);
+            curX += widths[1];
+
+            // Col 2: Retry Count (Red #DC2626)
+            slide.Rect(curX, tableY, widths[2], rowHeight, bgColor, borderColor);
+            slide.Text(item.Count.ToString("N0", CultureInfo.InvariantCulture), curX + 5000, tableY + 20000, widths[2] - 10000, rowHeight - 40000, 7, "DC2626", bold: true, wrap: false, padding: 5000);
+            curX += widths[2];
+
+            // Col 3: Percentage (Blue #2563EB)
+            slide.Rect(curX, tableY, widths[3], rowHeight, bgColor, borderColor);
+            slide.Text($"{item.Percentage:0.0}%", curX + 5000, tableY + 20000, widths[3] - 10000, rowHeight - 40000, 7, "2563EB", wrap: false, padding: 5000);
+            curX += widths[3];
+
+            // Col 4: Trend Badge
+            slide.Rect(curX, tableY, widths[4], rowHeight, bgColor, borderColor);
+            string trendText = "-";
+            string badgeColor = "6B7280"; // Gray
+            if (!string.IsNullOrEmpty(item.TrendIndicator))
+            {
+                if (item.TrendIndicator.Contains("Giảm") || item.TrendIndicator.Contains("giam") || item.TrendIndicator.Contains("▼"))
+                {
+                    trendText = "v Giam";
+                    badgeColor = "16A34A"; // Green
+                }
+                else if (item.TrendIndicator.Contains("Tăng") || item.TrendIndicator.Contains("tang") || item.TrendIndicator.Contains("▲"))
+                {
+                    trendText = "^ Tang";
+                    badgeColor = "DC2626"; // Red
+                }
+            }
+
+            // Badge shape inside cell
+            slide.Rect(curX + 60000, tableY + 30000, widths[4] - 120000, rowHeight - 60000, badgeColor, badgeColor);
+            slide.Text(trendText, curX + 60000, tableY + 40000, widths[4] - 120000, rowHeight - 80000, 7, "FFFFFF", bold: true, wrap: false, padding: 5000);
+            curX += widths[4];
+
+            // Col 5: Top Parts/Errors
+            slide.Rect(curX, tableY, widths[5], rowHeight, bgColor, borderColor);
+            var topParts = StripVietnameseForPpt(item.TopPartsOrErrors ?? "");
+            if (topParts.Length > 48) topParts = topParts[..45] + "...";
+            slide.Text(topParts, curX + 5000, tableY + 20000, widths[5] - 10000, rowHeight - 40000, 6, "4B5563", wrap: false, padding: 5000);
+
+            tableY += rowHeight;
+        }
+
+        // Summary Total Row at Bottom
+        curX = x;
+        var totalWidth01 = widths[0] + widths[1];
+        slide.Rect(curX, tableY, totalWidth01, rowHeight, "E2E8F0", "CBD5E1");
+        slide.Text("Tong cong:", curX + 5000, tableY + 20000, totalWidth01 - 10000, rowHeight - 40000, 7, "111111", bold: true, wrap: false, padding: 5000);
+        curX += totalWidth01;
+
+        // Total retries (Red #DC2626)
+        slide.Rect(curX, tableY, widths[2], rowHeight, "E2E8F0", "CBD5E1");
+        slide.Text(totalRetries.ToString("N0", CultureInfo.InvariantCulture), curX + 5000, tableY + 20000, widths[2] - 10000, rowHeight - 40000, 7, "DC2626", bold: true, wrap: false, padding: 5000);
+        curX += widths[2];
+
+        // Total percentage (Blue #2563EB)
+        slide.Rect(curX, tableY, widths[3], rowHeight, "E2E8F0", "CBD5E1");
+        slide.Text("100.0%", curX + 5000, tableY + 20000, widths[3] - 10000, rowHeight - 40000, 7, "2563EB", bold: true, wrap: false, padding: 5000);
+        curX += widths[3];
+
+        // Remaining empty cells for total row
+        var restWidth = widths[4] + widths[5];
+        slide.Rect(curX, tableY, restWidth, rowHeight, "E2E8F0", "CBD5E1");
+    }
+
+    private static void AddDailyColumnChart(SlideXmlBuilder slide, IReadOnlyList<DailyImprovementItem> dailyItems, int x, int y, int width, int height)
+    {
+        // Container box
+        slide.Rect(x, y, width, height, "FFFFFF", "E2E8F0");
+        slide.Text("BIEU DO THEO DOI RETRIES QUA CAC NGAY (XU HUONG TANG / GIAM)", x + 100000, y + 80000, width - 200000, 260000, 10, "1E3A8A", bold: true);
+
+        if (dailyItems == null || dailyItems.Count == 0)
+        {
+            slide.Text("Khong co du lieu bieu do", x + 100000, y + 1200000, width - 200000, 300000, 12, "888888");
+            return;
+        }
+
+        int n = dailyItems.Count;
+        int maxCount = Math.Max(1, dailyItems.Max(item => item.Count));
+        
+        int baselineY = y + height - 400000;
+        int maxBarHeight = height - 1200000; // Leave space for title and top labels
+
+        // X-axis baseline
+        slide.Rect(x + 100000, baselineY, width - 200000, 10000, "CBD5E1", "CBD5E1");
+
+        int totalPlotWidth = width - 200000;
+        int slotWidth = totalPlotWidth / Math.Max(1, n);
+        int barWidth = Math.Max(100000, Math.Min(500000, (int)(slotWidth * 0.55)));
+
+        for (int i = 0; i < n; i++)
+        {
+            var item = dailyItems[i];
+            int slotX = x + 100000 + i * slotWidth;
+            int barX = slotX + (slotWidth - barWidth) / 2;
+
+            double ratio = (double)item.Count / maxCount;
+            int barHeight = Math.Max(30000, (int)(ratio * maxBarHeight));
+            int barY = baselineY - barHeight;
+
+            // Blue Column Bar (#2563EB)
+            slide.Rect(barX, barY, barWidth, barHeight, "2563EB", "1D4ED8");
+
+            // Count Text above bar in Blue (#1E3A8A)
+            slide.Text(item.Count.ToString("N0", CultureInfo.InvariantCulture),
+                barX - 100000, barY - 200000, barWidth + 200000, 180000, 8, "1E3A8A", bold: true);
+
+            // Percentage Text above Count in Red (#DC2626)
+            slide.Text($"{item.Percentage:0.0}%",
+                barX - 100000, barY - 380000, barWidth + 200000, 180000, 8, "DC2626", bold: true);
+
+            // Date Text below baseline (#475569)
+            var shortDate = item.Date.Length > 10 ? item.Date[..10] : item.Date;
+            slide.Text(shortDate,
+                barX - 100000, baselineY + 30000, barWidth + 200000, 220000, 7, "475569");
+        }
+    }
+
     private static string BuildOverviewSlide(IReadOnlyList<ExpensivePartTopItem> topParts, IReadOnlyList<LineReportItem> lines, bool sortByCost)
     {
         var slide = new SlideXmlBuilder();
@@ -149,25 +419,25 @@ public class PowerPointReportService : IPowerPointReportService
         return slide.Build();
     }
 
-    private static string BuildStatusTableSlide(IReadOnlyList<ExpensivePartSummaryItem> items, IReadOnlySet<string> improvedLines)
+    private static string BuildStatusTableSlide(IReadOnlyList<ExpensivePartSummaryItem> items, IReadOnlySet<string> improvedRowKeys)
     {
         var slide = new SlideXmlBuilder();
         slide.Text("2. Bang theo doi line can cai thien", 250000, 160000, 7600000, 360000, 24, "000000", bold: true);
         slide.Text("Bang danh dau trang thai theo nhat ky cai thien da luu trong RetryLog.",
             250000, 560000, 9000000, 260000, 12, "555555");
-
+ 
         var headers = new[] { "Parts Name", "Line", "Lane", "May", "Error Name", "So lan", "Tong tien", "Trang thai" };
         var widths = new[] { 2200000, 780000, 650000, 650000, 1780000, 780000, 1350000, 980000 };
         var x = 250000;
         var y = 980000;
         const int rowHeight = 330000;
-
+ 
         AddTableRow(slide, headers, widths, x, y, rowHeight, "22272E", "FFFFFF", bold: true);
         y += rowHeight;
-
+ 
         foreach (var item in items)
         {
-            var improved = improvedLines.Contains(item.Line);
+            var improved = improvedRowKeys.Contains($"{item.Line}_{item.PartsName}_{item.Lane}_{item.Machine}_{item.Side}_{item.ErrorName}");
             var cells = new[]
             {
                 item.PartsName,
@@ -329,8 +599,10 @@ public class PowerPointReportService : IPowerPointReportService
         var left = x;
         for (var i = 0; i < cells.Count; i++)
         {
+            if (i >= widths.Count) break;
             slide.Rect(left, y, widths[i], h, fill, "FFFFFF");
-            slide.Text(cells[i], left + 45000, y + 45000, widths[i] - 90000, h - 90000, 8, textColor, bold);
+            var cellText = StripVietnameseForPpt(cells[i] ?? string.Empty);
+            slide.Text(cellText, left + 10000, y + 20000, widths[i] - 20000, h - 40000, 7, textColor, bold, wrap: false, padding: 10000);
             left += widths[i];
         }
     }
@@ -398,7 +670,7 @@ public class PowerPointReportService : IPowerPointReportService
         var slideOverrides = string.Concat(Enumerable.Range(1, slideCount)
             .Select(i => $"""<Override PartName="/ppt/slides/slide{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>"""));
 
-        return $"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>{slideOverrides}</Types>""";
+        return $"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>{slideOverrides}</Types>""";
     }
 
     private static string RootRelationships() =>
@@ -435,8 +707,10 @@ public class PowerPointReportService : IPowerPointReportService
     private static string SlideLayoutRelationships() =>
         """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>""";
 
-    private static string SlideRelationships() =>
-        """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>""";
+    private static string SlideRelationships(bool hasImage = false) =>
+        hasImage
+        ? """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"""
+        : """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>""";
 
     private static string Theme() =>
         """<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="LogMount"><a:themeElements><a:clrScheme name="LogMount"><a:dk1><a:srgbClr val="111111"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="22272E"/></a:dk2><a:lt2><a:srgbClr val="F4F6F8"/></a:lt2><a:accent1><a:srgbClr val="E85D70"/></a:accent1><a:accent2><a:srgbClr val="1F7A4D"/></a:accent2><a:accent3><a:srgbClr val="2B66D9"/></a:accent3><a:accent4><a:srgbClr val="F0B429"/></a:accent4><a:accent5><a:srgbClr val="6C757D"/></a:accent5><a:accent6><a:srgbClr val="B42318"/></a:accent6><a:hlink><a:srgbClr val="2B66D9"/></a:hlink><a:folHlink><a:srgbClr val="6C757D"/></a:folHlink></a:clrScheme><a:fontScheme name="LogMount"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme><a:fmtScheme name="LogMount"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>""";
@@ -460,14 +734,15 @@ internal sealed class SlideXmlBuilder
         private readonly StringBuilder _content = new();
         private int _shapeId = 1;
 
-        public void Text(string text, int x, int y, int w, int h, int fontSize, string color, bool bold = false)
+        public void Text(string text, int x, int y, int w, int h, int fontSize, string color, bool bold = false, bool wrap = true, int padding = 10000)
         {
             var escapedText = SecurityElement.Escape(text ?? string.Empty) ?? string.Empty;
             var runs = escapedText.Split('\n').Select(line =>
                 $"<a:p><a:r><a:rPr lang=\"en-US\" sz=\"{fontSize * 100}\"{(bold ? " b=\"1\"" : string.Empty)}><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill></a:rPr><a:t>{line}</a:t></a:r><a:endParaRPr lang=\"en-US\" sz=\"{fontSize * 100}\"/></a:p>");
 
+            var wrapAttr = wrap ? "wrap=\"square\"" : "wrap=\"none\"";
             _content.Append($"""
-<p:sp><p:nvSpPr><p:cNvPr id="{NextId()}" name="TextBox"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square" rtlCol="0"/><a:lstStyle/>{string.Concat(runs)}</p:txBody></p:sp>
+<p:sp><p:nvSpPr><p:cNvPr id="{NextId()}" name="TextBox"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr lIns="{padding}" rIns="{padding}" tIns="{padding}" bIns="{padding}" {wrapAttr} rtlCol="0"/><a:lstStyle/>{string.Concat(runs)}</p:txBody></p:sp>
 """);
         }
 
@@ -475,6 +750,13 @@ internal sealed class SlideXmlBuilder
         {
             _content.Append($"""
 <p:sp><p:nvSpPr><p:cNvPr id="{NextId()}" name="Rectangle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="{fill}"/></a:solidFill><a:ln w="6350"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln></p:spPr></p:sp>
+""");
+        }
+
+        public void Picture(string relId, int x, int y, int w, int h)
+        {
+            _content.Append($"""
+<p:pic><p:nvPicPr><p:cNvPr id="{NextId()}" name="Picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:blipFill><a:blip r:embed="{relId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill></p:pic>
 """);
         }
 

@@ -24,6 +24,7 @@ public class RequestLogModel(LogMountDbContext dbContext, IRequestLogParserServi
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
+        await importer.CleanupDuplicatesAsync(cancellationToken);
         Dates = await dbContext.RequestLogEntries.AsNoTracking().Where(x => x.Date != null).Select(x => x.Date!).Distinct().OrderByDescending(x => x).ToListAsync(cancellationToken);
         Lines = await dbContext.RequestLogEntries.AsNoTracking().Where(x => x.Line != null).Select(x => x.Line!).Distinct().OrderBy(x => x).ToListAsync(cancellationToken);
         var query = dbContext.RequestLogEntries.AsNoTracking();

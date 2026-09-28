@@ -22,7 +22,8 @@ public class RequestLogDataByDateModel(LogMountDbContext dbContext) : PageModel
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         AvailableDates = await dbContext.RequestLogEntries.AsNoTracking().Where(x => x.Date != null).Select(x => x.Date!).Distinct().OrderByDescending(x => x).ToListAsync(cancellationToken);
-        SelectedDate = string.IsNullOrWhiteSpace(SelectedDate) ? AvailableDates.FirstOrDefault() : SelectedDate.Trim();
+        var normDate = string.IsNullOrWhiteSpace(SelectedDate) ? null : Services.RequestLogParserService.NormalizeDate(SelectedDate.Trim());
+        SelectedDate = normDate ?? (string.IsNullOrWhiteSpace(SelectedDate) ? AvailableDates.FirstOrDefault() : SelectedDate.Trim());
         if (string.IsNullOrWhiteSpace(SelectedDate)) return;
         var query = dbContext.RequestLogEntries.AsNoTracking().Where(x => x.Date == SelectedDate);
         AvailableLines = await query.Where(x => x.Line != null).Select(x => x.Line!).Distinct().OrderBy(x => x).ToListAsync(cancellationToken);

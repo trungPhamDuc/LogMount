@@ -35,6 +35,8 @@ public class ErrorLogDashboardModel : PageModel
     public string MonthlyErrorChartJson { get; set; } = "[]";
     public int DailyErrorTotal { get; set; }
     public int MonthlyErrorTotal { get; set; }
+    public int DailyErrorTypeCount { get; set; }
+    public int MonthlyErrorTypeCount { get; set; }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -57,6 +59,8 @@ public class ErrorLogDashboardModel : PageModel
 
         DailyErrorTotal = await GetErrorTotalAsync(SelectedDate, null, cancellationToken);
         MonthlyErrorTotal = await GetErrorTotalAsync(null, SelectedMonth, cancellationToken);
+        DailyErrorTypeCount = dailyChart.Count;
+        MonthlyErrorTypeCount = monthlyChart.Count;
 
         DailyErrorChartJson = JsonSerializer.Serialize(dailyChart, ChartJsonOptions);
         MonthlyErrorChartJson = JsonSerializer.Serialize(monthlyChart, ChartJsonOptions);

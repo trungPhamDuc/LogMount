@@ -74,9 +74,53 @@
                     </div>
                 </div>
                 <div class="col-lg-7">
-                    <div class="report-notes">
-                        <p>- Những Line phải tiến hành cải thiện : @FormatLines(Model.NeedImproveLines)</p>
-                        <p>- Những Line đã có báo cáo cải thiện : @FormatLines(Model.ImprovedLines)</p>
+                    <div class="report-notes card shadow-sm p-3">
+                        <h3 class="h6 fw-bold border-bottom pb-2 mb-3"><i class="bi bi-clock-history text-primary"></i> Theo dõi trạng thái cải thiện theo Line</h3>
+                        @{
+                            var allUniqueLines = Model.NeedImproveLines.Concat(Model.ImprovedLines)
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .OrderBy(x => ImprovementReportModel.GetLineSortOrder(x))
+                                .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
+                                .ToList();
+                        }
+                        @if (allUniqueLines.Count == 0)
+                        {
+                            <div class="text-muted small text-center py-2">Không có dữ liệu Line cần theo dõi cải thiện.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle text-center mb-0" style="font-size: 0.9rem;">
+                                    <tbody>
+                                        <tr>
+                                            <td class="fw-bold text-start table-light" style="width: 200px;">Line cần cải thiện</td>
+                                            @foreach (var lineName in allUniqueLines)
+                                            {
+                                                var displayLineName = lineName.StartsWith("L", StringComparison.OrdinalIgnoreCase) ? "Line " + lineName[1..] : lineName;
+                                                <td class="fw-semibold text-dark">@displayLineName</td>
+                                            }
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold text-start table-light">Đã có báo cáo cải thiện</td>
+                                            @foreach (var lineName in allUniqueLines)
+                                            {
+                                                var hasImprovement = Model.ImprovedLines.Contains(lineName, StringComparer.OrdinalIgnoreCase);
+                                                <td>
+                                                    @if (hasImprovement)
+                                                    {
+                                                        <span class="text-success fw-bold fs-5">✓</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted fs-5">□</span>
+                                                    }
+                                                </td>
+                                            }
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -111,7 +155,7 @@
                             <tbody>
                                 @foreach (var item in group.Rows)
                                 {
-                                    var improved = Model.ImprovedLines.Contains(item.Line, StringComparer.OrdinalIgnoreCase);
+                                    var improved = Model.IsRowImproved(item);
                                     <tr>
                                         <td class="fw-semibold">@item.PartsName</td>
                                         <td>@item.Line</td>
@@ -157,7 +201,7 @@
 @section Scripts {
     @if (Model.SummaryItems.Count > 0)
     {
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script src="~/js/chart-enhancements.js" asp-append-version="true"></script>
         <script>
             (function () {
                 var canvas = document.getElementById('expensiveSummaryChart');

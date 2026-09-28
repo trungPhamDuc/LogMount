@@ -50,7 +50,16 @@ public class RequestLogParserService : IRequestLogParserService
             while (reader.Read())
             {
                 var values = new string[reader.FieldCount];
-                for (var i = 0; i < reader.FieldCount; i++) values[i] = reader.GetValue(i)?.ToString()?.Trim() ?? string.Empty;
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    var val = reader.GetValue(i);
+                    values[i] = val switch
+                    {
+                        DateTime dt => dt.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture),
+                        null => string.Empty,
+                        _ => val.ToString()?.Trim() ?? string.Empty
+                    };
+                }
                 rows.Add(values);
             }
 
@@ -64,7 +73,38 @@ public class RequestLogParserService : IRequestLogParserService
 
         if (!foundRequestSheet)
         {
-            throw new InvalidOperationException("Không tìm thấy dữ liệu hợp lệ trong các sheet T3, T4, ... (Sheet1 được bỏ qua).");
+            reader.Reset();
+            do
+            {
+                var rows = new List<string[]>();
+                while (reader.Read())
+                {
+                    var values = new string[reader.FieldCount];
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        var val = reader.GetValue(i);
+                        values[i] = val switch
+                        {
+                            DateTime dt => dt.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture),
+                            null => string.Empty,
+                            _ => val.ToString()?.Trim() ?? string.Empty
+                        };
+                    }
+                    rows.Add(values);
+                }
+
+                var sheetEntries = ParseRows(rows, throwIfHeaderMissing: false);
+                if (sheetEntries.Count > 0)
+                {
+                    foundRequestSheet = true;
+                    entries.AddRange(sheetEntries);
+                }
+            } while (reader.NextResult());
+        }
+
+        if (!foundRequestSheet)
+        {
+            throw new InvalidOperationException("Không tìm thấy dữ liệu hợp lệ trong file RequestLog.");
         }
 
         return entries;
@@ -140,12 +180,28 @@ public class RequestLogParserService : IRequestLogParserService
             || decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ? result : 0;
     }
 
-    private static string? NormalizeDate(string? value)
+    public static string? NormalizeDate(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        return DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var date) ||
-               DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
-            ? date.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture) : value.Trim();
+        var str = value.Trim();
+
+        string[] formats = ["yyyy/MM/dd", "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "MM/dd/yyyy", "M/d/yyyy", "yyyy/M/d", "yyyy-M-d", "dd-MM-yyyy", "d-M-yyyy",
+                            "yyyy/MM/dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "dd/MM/yyyy HH:mm:ss", "MM/dd/yyyy HH:mm:ss",
+                            "yyyy/MM/dd h:mm:ss tt", "yyyy-MM-dd h:mm:ss tt", "dd/MM/yyyy h:mm:ss tt", "MM/dd/yyyy h:mm:ss tt"];
+
+        if (DateTime.TryParseExact(str, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+        {
+            return parsedDate.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture);
+        }
+
+        if (DateTime.TryParse(str, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedDate) ||
+            DateTime.TryParse(str, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDate) ||
+            DateTime.TryParse(str, new CultureInfo("vi-VN"), DateTimeStyles.None, out parsedDate))
+        {
+            return parsedDate.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture);
+        }
+
+        return str;
     }
 
     private static string Normalize(string value) => new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());

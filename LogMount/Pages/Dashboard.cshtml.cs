@@ -63,6 +63,15 @@ public class DashboardModel : PageModel
             SelectedMonth = await GetLatestMonthAsync(cancellationToken) ?? SelectedMonth;
         }
 
+        DailyErrorTotal = await GetErrorTotalAsync(SelectedDate, null, cancellationToken);
+        MonthlyErrorTotal = await GetErrorTotalAsync(null, SelectedMonth, cancellationToken);
+        var dailyPartsSummary = await BuildExpensivePartSummaryAsync(SelectedDate, null, cancellationToken);
+        var monthlyPartsSummary = await BuildExpensivePartSummaryAsync(null, SelectedMonth, cancellationToken);
+        DailyExpensivePartErrorTotal = dailyPartsSummary.Sum(x => x.Count);
+        MonthlyExpensivePartErrorTotal = monthlyPartsSummary.Sum(x => x.Count);
+        DailyExpensivePartCostTotal = dailyPartsSummary.Sum(x => x.TotalCost);
+        MonthlyExpensivePartCostTotal = monthlyPartsSummary.Sum(x => x.TotalCost);
+
     }
 
     public async Task<IActionResult> OnGetChartAsync(string chart, string? selectedDate, string? selectedMonth, int topN, CancellationToken cancellationToken)

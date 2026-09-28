@@ -35,7 +35,27 @@ public class ImprovementReportModel(
     public IReadOnlyList<ExpensivePartReportGroup> ReportGroups { get; private set; } = [];
     public IReadOnlyList<string> NeedImproveLines { get; private set; } = [];
     public IReadOnlyList<string> ImprovedLines { get; private set; } = [];
+    public IReadOnlyList<RetryImprove> Improvements { get; private set; } = [];
     public string ChartDataJson { get; private set; } = "[]";
+
+    public bool IsRowImproved(ExpensivePartSummaryItem item)
+    {
+        return Improvements.Any(imp => 
+            string.Equals(imp.Line?.Trim(), item.Line?.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            (string.IsNullOrEmpty(imp.PartsName) || string.Equals(imp.PartsName.Trim(), item.PartsName?.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(imp.Lane) || string.Equals(imp.Lane.Trim(), item.Lane?.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(imp.Machine) || string.Equals(imp.Machine.Trim(), item.Machine?.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(imp.Side) || 
+             string.Equals(imp.Side.Trim(), item.Side?.Trim(), StringComparison.OrdinalIgnoreCase) || 
+             string.Equals(imp.Side.Trim(), item.SideLabel?.Trim(), StringComparison.OrdinalIgnoreCase) || 
+             (imp.Side.Trim().Equals("TOP", StringComparison.OrdinalIgnoreCase) && item.Side?.Equals("T", StringComparison.OrdinalIgnoreCase) == true) || 
+             (imp.Side.Trim().Equals("BOT", StringComparison.OrdinalIgnoreCase) && item.Side?.Equals("B", StringComparison.OrdinalIgnoreCase) == true)) &&
+            (string.IsNullOrEmpty(imp.ErrorName) || 
+             string.Equals(imp.ErrorName.Trim(), item.ErrorName?.Trim(), StringComparison.OrdinalIgnoreCase) || 
+             item.ErrorName?.Contains(imp.ErrorName.Trim(), StringComparison.OrdinalIgnoreCase) == true || 
+             imp.ErrorName.Contains(item.ErrorName.Trim(), StringComparison.OrdinalIgnoreCase) == true)
+        );
+    }
     public int TotalCount => SummaryItems.Sum(x => x.Count);
     public decimal TotalCost => SummaryItems.Sum(x => x.TotalCost);
 
@@ -53,10 +73,21 @@ public class ImprovementReportModel(
             return BadRequest("Không có dữ liệu để tải PowerPoint.");
         }
 
+        var improvedRowKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in ReportGroups.SelectMany(x => x.Rows))
+        {
+            if (IsRowImproved(item))
+            {
+                improvedRowKeys.Add($"{item.Line}_{item.PartsName}_{item.Lane}_{item.Machine}_{item.Side}_{item.ErrorName}");
+            }
+        }
+
         var exportResult = powerPointReportService.ExportExpensivePartSummary(
             TopParts,
             ReportGroups.SelectMany(x => x.Rows).ToList(),
             new HashSet<string>(ImprovedLines, StringComparer.OrdinalIgnoreCase),
+            improvedRowKeys,
+            SortBy == "cost-desc",
             $"expensive-component-{SelectedDate:yyyyMMdd}");
 
         return File(exportResult.Content, exportResult.ContentType, exportResult.FileName);
@@ -64,10 +95,27 @@ public class ImprovementReportModel(
 
     private async Task LoadReportAsync(CancellationToken cancellationToken)
     {
-        TopN = TopN is 5 or 10 or 20 or 30 ? TopN : 10;
-        SortBy = SortBy.Equals("cost-desc", StringComparison.OrdinalIgnoreCase)
+        var querySortBy = Request.Query["SortBy"].ToString();
+        if (!string.IsNullOrEmpty(querySortBy))
+        {
+            SortBy = querySortBy;
+        }
+        SortBy = string.Equals(SortBy, "cost-desc", StringComparison.OrdinalIgnoreCase)
             ? "cost-desc"
             : "count-desc";
+
+        var queryTopN = Request.Query["TopN"].ToString();
+        if (!string.IsNullOrEmpty(queryTopN) && int.TryParse(queryTopN, out var valTopN))
+        {
+            TopN = valTopN;
+        }
+        TopN = TopN is 5 or 10 or 20 or 30 ? TopN : 10;
+
+        var querySelectedDate = Request.Query["SelectedDate"].ToString();
+        if (!string.IsNullOrEmpty(querySelectedDate) && DateOnly.TryParse(querySelectedDate, out var valDate))
+        {
+            SelectedDate = valDate;
+        }
 
         var rawDates = await dbContext.RetryLogEntries.AsNoTracking()
             .Where(x => x.Date != null && x.Date != "")
@@ -114,9 +162,12 @@ public class ImprovementReportModel(
             x.TotalCost
         }), JsonOptions);
 
-        var topPartNames = TopParts.Take(3).Select(x => x.PartsName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        ReportGroups = TopParts
-            .Where(x => topPartNames.Contains(x.PartsName))
+        var selectedTopParts = TopParts
+            .OrderByDescending(x => x.TotalCount >= 6 ? 1 : 0)
+            .Take(4)
+            .ToList();
+
+        ReportGroups = selectedTopParts
             .Select(top => new ExpensivePartReportGroup
             {
                 PartsName = top.PartsName,
@@ -132,30 +183,32 @@ public class ImprovementReportModel(
 
         var reportRows = ReportGroups.SelectMany(x => x.Rows).ToList();
         var lines = reportRows
-            .Select(x => x.Line)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(x => !string.IsNullOrWhiteSpace(x.Line))
+            .GroupBy(x => x.Line.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Sum(x => x.Count) >= 6)
+            .Select(g => g.Key)
             .ToList();
 
-        var improves = await dbContext.RetryImproves.AsNoTracking()
-            .Where(x => x.ExecutionDate <= SelectedDate.Value.ToDateTime(TimeOnly.MaxValue))
-            .Where(x => x.Line != null && lines.Contains(x.Line))
-            .Select(x => x.Line!)
-            .Distinct()
+        var selectedDateStart = SelectedDate.Value.ToDateTime(TimeOnly.MinValue);
+        var selectedDateEnd = SelectedDate.Value.ToDateTime(TimeOnly.MaxValue);
+        Improvements = await dbContext.RetryImproves.AsNoTracking()
+            .Where(x => x.ExecutionDate >= selectedDateStart && x.ExecutionDate <= selectedDateEnd)
+            .Where(x => x.Line != null)
             .ToListAsync(cancellationToken);
 
-        ImprovedLines = improves
+        var improvedLineNames = Improvements
+            .Select(x => x.Line!)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        ImprovedLines = improvedLineNames
             .OrderBy(GetLineSortOrder)
             .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var improvedSet = new HashSet<string>(ImprovedLines, StringComparer.OrdinalIgnoreCase);
-        NeedImproveLines = reportRows
-            .Where(x => !string.IsNullOrWhiteSpace(x.Line) && !improvedSet.Contains(x.Line))
-            .GroupBy(x => x.Line, StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(x => SortBy == "cost-desc" ? x.Sum(i => i.TotalCost) : x.Sum(i => i.Count))
-            .ThenByDescending(x => SortBy == "cost-desc" ? x.Sum(i => i.Count) : x.Sum(i => i.TotalCost))
-            .Select(x => x.Key)
+        NeedImproveLines = lines
+            .Where(x => !improvedLineNames.Contains(x))
             .OrderBy(GetLineSortOrder)
             .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -181,7 +234,7 @@ public class ImprovementReportModel(
             : null;
     }
 
-    private static int GetLineSortOrder(string? line)
+    public static int GetLineSortOrder(string? line)
     {
         var value = line?.Trim() ?? string.Empty;
         return value.StartsWith("L", StringComparison.OrdinalIgnoreCase) &&

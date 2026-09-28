@@ -36,6 +36,39 @@
         </div>
     </div>
 
+    <section class="dashboard-kpi-grid" aria-label="Tổng hợp số liệu RetryLog">
+        <article class="dashboard-kpi-card kpi-blue">
+            <span class="dashboard-kpi-label">Tổng lỗi ngày @Model.SelectedDate</span>
+            <strong class="dashboard-kpi-value">@Model.DailyErrorTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">lỗi</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-green">
+            <span class="dashboard-kpi-label">Lỗi linh kiện đắt tiền ngày</span>
+            <strong class="dashboard-kpi-value">@Model.DailyExpensivePartErrorTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">lỗi</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-amber">
+            <span class="dashboard-kpi-label">Chi phí linh kiện ngày</span>
+            <strong class="dashboard-kpi-value">@Model.DailyExpensivePartCostTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">đồng</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-blue">
+            <span class="dashboard-kpi-label">Tổng lỗi tháng @Model.SelectedMonth</span>
+            <strong class="dashboard-kpi-value">@Model.MonthlyErrorTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">lỗi</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-green">
+            <span class="dashboard-kpi-label">Lỗi linh kiện đắt tiền tháng</span>
+            <strong class="dashboard-kpi-value">@Model.MonthlyExpensivePartErrorTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">lỗi</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-amber">
+            <span class="dashboard-kpi-label">Chi phí linh kiện tháng</span>
+            <strong class="dashboard-kpi-value">@Model.MonthlyExpensivePartCostTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">đồng</span>
+        </article>
+    </section>
+
     <div class="row g-4">
         <div class="col-xl-6">
             <div class="card shadow-sm h-100 dashboard-chart-card" data-dashboard-chart="daily-error">
@@ -304,12 +337,12 @@
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script src="~/js/chart-enhancements.js" asp-append-version="true"></script>
     <script>
         (function () {
             var dashboardPalette = [
-                '#dc2626', '#2563eb', '#22c55e', '#f59e0b', '#8b5cf6',
-                '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b'
+                '#2563eb', '#22a66a', '#f59e0b', '#0ea5a4', '#f97316',
+                '#7c8fb0', '#8b5cf6', '#14b8a6', '#64748b', '#e879a9'
             ];
 
             var centerTextPlugin = {
@@ -368,6 +401,19 @@
                 return item.label || '(Không có tên)';
             }
 
+            function getErrorCssClass(errorName) {
+                if (!errorName) return 'error-name-tag error-name-empty';
+                var upper = String(errorName).trim().toUpperCase();
+                if (upper.indexOf('PICK UP') !== -1 || upper.indexOf('PICKUP') !== -1) return 'error-name-tag error-name-pickup';
+                if (upper.indexOf('VACUUM') !== -1 || upper.indexOf('VACCUM') !== -1) return 'error-name-tag error-name-vacuum';
+                if (upper.indexOf('AUTORUN') !== -1 || upper.indexOf('AUTO RUN') !== -1) return 'error-name-tag error-name-autorun';
+                if (upper.indexOf('PARTS') !== -1) return 'error-name-tag error-name-parts';
+                if (upper.indexOf('VISION') !== -1 || upper.indexOf('CAMERA') !== -1 || upper.indexOf('SIDE VIEW') !== -1) return 'error-name-tag error-name-vision';
+                if (upper.indexOf('LEAD') !== -1 || upper.indexOf('WIDTH') !== -1) return 'error-name-tag error-name-lead';
+                if (upper.indexOf('INTERLOCK') !== -1 || upper.indexOf('NON-SAVED') !== -1 || upper.indexOf('RESET') !== -1) return 'error-name-tag error-name-interlock';
+                return 'error-name-tag error-name-default';
+            }
+
             function buildUrl(baseUrl, parameters) {
                 var url = new URL(baseUrl, window.location.origin);
                 Object.keys(parameters).forEach(function (key) {
@@ -396,7 +442,7 @@
                 });
 
                 new Chart(canvas, {
-                    type: 'doughnut',
+                    type: 'pie',
                     data: {
                         labels: data.map(getLabel),
                         datasets: [{
@@ -404,20 +450,17 @@
                             backgroundColor: colors,
                             borderColor: '#fff',
                             borderWidth: 2,
-                            hoverOffset: 8
+                            hoverOffset: 6
                         }]
                     },
                     options: {
-                        cutout: '62%',
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            centerText: {
-                                total: total,
-                                unit: unit
-                            },
                             legend: {
-                                display: false
+                                display: true,
+                                position: 'right',
+                                labels: { boxWidth: 10, boxHeight: 10, padding: 9, font: { size: 10 } }
                             },
                             tooltip: {
                                 callbacks: {
@@ -445,14 +488,13 @@
                         labels: data.map(getLabel),
                         datasets: [{
                             data: data.map(function (item) { return item.value; }),
-                            backgroundColor: 'rgba(220, 38, 38, 0.72)',
-                            borderColor: 'rgba(220, 38, 38, 1)',
+                            backgroundColor: 'rgba(37, 99, 235, 0.82)',
+                            borderColor: 'rgba(29, 78, 216, 1)',
                             borderWidth: 1,
                             borderRadius: 4
                         }]
                     },
                     options: {
-                        indexAxis: 'y',
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
@@ -460,13 +502,13 @@
                         },
                         scales: {
                             x: {
-                                beginAtZero: true,
-                                ticks: {
-                                    precision: 0
-                                }
+                                ticks: { maxRotation: 45, minRotation: 0, autoSkip: true },
+                                grid: { display: false }
                             },
                             y: {
+                                beginAtZero: true,
                                 ticks: {
+                                    precision: 0,
                                     font: { size: 10 }
                                 }
                             }
@@ -491,15 +533,16 @@
                     var percent = getPercent(item.value, total);
                     var labelText = item.label || '(Không có tên)';
                     var label = escapeHtml(labelText);
+                    var badgeClass = getErrorCssClass(labelText);
                     var href = linkBuilder ? linkBuilder(labelText) : null;
                     var labelHtml = href
-                        ? '<a class="dashboard-table-link" href="' + escapeHtml(href) + '">' + label + '</a>'
-                        : label;
+                        ? '<a class="dashboard-table-link" href="' + escapeHtml(href) + '"><span class="' + badgeClass + '">' + label + '</span></a>'
+                        : '<span class="' + badgeClass + '">' + label + '</span>';
 
                     return '<tr>' +
                         '<td class="text-truncate" title="' + label + '">' + labelHtml + '</td>' +
                         '<td class="text-end fw-semibold">' + formatValue(item.value, unit) + '</td>' +
-                        '<td class="text-end text-danger fw-semibold">' + percent + '%</td>' +
+                        '<td class="text-end"><span class="dashboard-table-percent">' + percent + '%</span></td>' +
                     '</tr>';
                 }).join('');
             }

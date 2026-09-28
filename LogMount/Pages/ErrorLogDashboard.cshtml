@@ -36,6 +36,29 @@
         </div>
     </div>
 
+    <section class="dashboard-kpi-grid errorlog-kpi-grid" aria-label="Tổng hợp số liệu ErrorLog">
+        <article class="dashboard-kpi-card kpi-blue">
+            <span class="dashboard-kpi-label">Tổng lượt lỗi ngày @Model.SelectedDate</span>
+            <strong class="dashboard-kpi-value">@Model.DailyErrorTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">lượt</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-green">
+            <span class="dashboard-kpi-label">Nhóm lỗi hiển thị ngày</span>
+            <strong class="dashboard-kpi-value">@Model.DailyErrorTypeCount.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">nhóm · theo Top N</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-blue">
+            <span class="dashboard-kpi-label">Tổng lượt lỗi tháng @Model.SelectedMonth</span>
+            <strong class="dashboard-kpi-value">@Model.MonthlyErrorTotal.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">lượt</span>
+        </article>
+        <article class="dashboard-kpi-card kpi-green">
+            <span class="dashboard-kpi-label">Nhóm lỗi hiển thị tháng</span>
+            <strong class="dashboard-kpi-value">@Model.MonthlyErrorTypeCount.ToString("N0")</strong>
+            <span class="dashboard-kpi-unit">nhóm · theo Top N</span>
+        </article>
+    </section>
+
     <div class="row g-4">
         <div class="col-xl-6">
             <div class="card shadow-sm h-100 dashboard-chart-card">
@@ -128,10 +151,10 @@
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script src="~/js/chart-enhancements.js" asp-append-version="true"></script>
     <script>
         (function () {
-            var palette = ['#dc2626', '#2563eb', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b'];
+            var palette = ['#2563eb', '#22a66a', '#f59e0b', '#0ea5a4', '#f97316', '#7c8fb0', '#8b5cf6', '#14b8a6', '#64748b', '#e879a9'];
 
             function getPercent(value, total) {
                 return total ? (value * 100 / total).toFixed(1) : '0.0';
@@ -219,7 +242,7 @@
 
                 var total = data.reduce(function (sum, item) { return sum + item.value; }, 0);
                 new Chart(canvas, {
-                    type: 'doughnut',
+                    type: 'pie',
                     data: {
                         labels: data.map(getLabel),
                         datasets: [{
@@ -227,19 +250,18 @@
                             backgroundColor: data.map(function (_, index) { return palette[index] || palette[palette.length - 1]; }),
                             borderColor: '#fff',
                             borderWidth: 2,
-                            hoverOffset: 8
+                            hoverOffset: 6
                         }]
                     },
                     options: {
-                        cutout: '62%',
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            centerText: {
-                                total: total,
-                                unit: 'lỗi'
+                            legend: {
+                                display: true,
+                                position: 'right',
+                                labels: { boxWidth: 10, boxHeight: 10, padding: 9, font: { size: 10 } }
                             },
-                            legend: { display: false },
                             tooltip: {
                                 callbacks: {
                                     label: function (context) {
@@ -265,18 +287,20 @@
                         labels: data.map(getLabel),
                         datasets: [{
                             data: data.map(function (item) { return item.value; }),
-                            backgroundColor: 'rgba(220, 38, 38, 0.72)',
-                            borderColor: 'rgba(220, 38, 38, 1)',
+                            backgroundColor: 'rgba(37, 99, 235, 0.82)',
+                            borderColor: 'rgba(29, 78, 216, 1)',
                             borderWidth: 1,
                             borderRadius: 4
                         }]
                     },
                     options: {
-                        indexAxis: 'y',
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
-                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 10 } } } }
+                        scales: {
+                            x: { ticks: { maxRotation: 45, minRotation: 0, autoSkip: true }, grid: { display: false } },
+                            y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
+                        }
                     }
                 });
             }
@@ -300,7 +324,7 @@
                     return '<tr>' +
                         '<td class="text-truncate error-name-cell" title="' + escapeHtml(labelText) + '"><a class="dashboard-table-link" href="' + escapeHtml(href) + '"><span class="' + badgeClass + '">' + escapeHtml(labelText) + '</span></a></td>' +
                         '<td class="text-end fw-semibold">' + formatValue(item.value) + '</td>' +
-                        '<td class="text-end text-danger fw-semibold">' + getPercent(item.value, total) + '%</td>' +
+                        '<td class="text-end"><span class="dashboard-table-percent">' + getPercent(item.value, total) + '%</span></td>' +
                     '</tr>';
                 }).join('');
             }
